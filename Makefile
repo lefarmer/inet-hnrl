@@ -10,13 +10,13 @@ cleanall: checkmakefiles
 	rm -f src/Makefile
 
 makefiles:
-	cd src && opp_makemake -f --deep --make-so -o inet -O out
+	cd src && opp_makemake -f --deep --make-so -o inet -O out $$NSC_VERSION_DEF
 
 checkmakefiles:
 	@if [ ! -f src/Makefile ]; then \
 	echo; \
 	echo '======================================================================='; \
-	echo 'src/Makefile does not exist. Please use "make makefiles" to genrate it!'; \
+	echo 'src/Makefile does not exist. Please use "make makefiles" to generate it!'; \
 	echo '======================================================================='; \
 	echo; \
 	exit 1; \

@@ -256,7 +256,7 @@ void RoutingTable::configureInterfaceForIPv4(InterfaceEntry *ie)
 
 InterfaceEntry *RoutingTable::getInterfaceByAddress(const IPAddress& addr) const
 {
-    Enter_Method("getInterfaceByAddress(%x)", addr.getInt()); // note: str().c_str() too slow here
+    Enter_Method("getInterfaceByAddress(%u.%u.%u.%u)", addr.getDByte(0), addr.getDByte(1), addr.getDByte(2), addr.getDByte(3)); // note: str().c_str() too slow here
 
     if (addr.isUnspecified())
         return NULL;
@@ -287,7 +287,7 @@ void RoutingTable::configureLoopbackForIPv4()
 
 bool RoutingTable::isLocalAddress(const IPAddress& dest) const
 {
-    Enter_Method("isLocalAddress(%x)", dest.getInt()); // note: str().c_str() too slow here
+    Enter_Method("isLocalAddress(%u.%u.%u.%u)", dest.getDByte(0), dest.getDByte(1), dest.getDByte(2), dest.getDByte(3)); // note: str().c_str() too slow here
 
     if (localAddresses.empty())
     {
@@ -305,14 +305,13 @@ bool RoutingTable::isLocalAddress(const IPAddress& dest) const
 
 bool RoutingTable::isLocalMulticastAddress(const IPAddress& dest) const
 {
-    Enter_Method("isLocalMulticastAddress(%x)", dest.getInt()); // note: str().c_str() too slow here
+    Enter_Method("isLocalMulticastAddress(%u.%u.%u.%u)", dest.getDByte(0), dest.getDByte(1), dest.getDByte(2), dest.getDByte(3)); // note: str().c_str() too slow here
 
     for (int i=0; i<ift->getNumInterfaces(); i++)
     {
         InterfaceEntry *ie = ift->getInterface(i);
-        for (unsigned int j=0; j < ie->ipv4Data()->getMulticastGroups().size(); j++)
-            if (dest.equals(ie->ipv4Data()->getMulticastGroups()[j]))
-                return true;
+        if (ie->ipv4Data()->isMemberOfMulticastGroup(dest))
+            return true;
     }
     return false;
 }
@@ -353,7 +352,8 @@ const bool RoutingTable::testValidity(const IPRoute *entry) const
 
 const IPRoute *RoutingTable::findBestMatchingRoute(const IPAddress& dest) const
 {
-    Enter_Method("findBestMatchingRoute(%x)", dest.getInt()); // note: str().c_str() too slow here
+    Enter_Method("findBestMatchingRoute(%u.%u.%u.%u)", dest.getDByte(0), dest.getDByte(1), dest.getDByte(2), dest.getDByte(3)); // note: str().c_str() too slow here
+
     RoutingCache::iterator it = routingCache.find(dest);
 
     if (it != routingCache.end())
@@ -418,7 +418,7 @@ const IPRoute *RoutingTable::findBestMatchingRoute(const IPAddress& dest) const
 
 InterfaceEntry *RoutingTable::getInterfaceForDestAddr(const IPAddress& dest) const
 {
-    Enter_Method("getInterfaceForDestAddr(%x)", dest.getInt()); // note: str().c_str() too slow here
+    Enter_Method("getInterfaceForDestAddr(%u.%u.%u.%u)", dest.getDByte(0), dest.getDByte(1), dest.getDByte(2), dest.getDByte(3)); // note: str().c_str() too slow here
 
     const IPRoute *e = findBestMatchingRoute(dest);
     return e ? e->getInterface() : NULL;
@@ -426,7 +426,7 @@ InterfaceEntry *RoutingTable::getInterfaceForDestAddr(const IPAddress& dest) con
 
 IPAddress RoutingTable::getGatewayForDestAddr(const IPAddress& dest) const
 {
-    Enter_Method("getGatewayForDestAddr(%x)", dest.getInt()); // note: str().c_str() too slow here
+    Enter_Method("getGatewayForDestAddr(%u.%u.%u.%u)", dest.getDByte(0), dest.getDByte(1), dest.getDByte(2), dest.getDByte(3)); // note: str().c_str() too slow here
 
     const IPRoute *e = findBestMatchingRoute(dest);
     return e ? e->getGateway() : IPAddress();
@@ -435,7 +435,7 @@ IPAddress RoutingTable::getGatewayForDestAddr(const IPAddress& dest) const
 
 MulticastRoutes RoutingTable::getMulticastRoutesFor(const IPAddress& dest) const
 {
-    Enter_Method("getMulticastRoutesFor(%x)", dest.getInt()); // note: str().c_str() too slow here here
+    Enter_Method("getMulticastRoutesFor(%u.%u.%u.%u)", dest.getDByte(0), dest.getDByte(1), dest.getDByte(2), dest.getDByte(3)); // note: str().c_str() too slow here here
 
     MulticastRoutes res;
     res.reserve(16);

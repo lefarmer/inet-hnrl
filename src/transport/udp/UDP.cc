@@ -173,10 +173,10 @@ void UDP::unbind(int sockId)
     delete sd;
 }
 
-short UDP::getEphemeralPort()
+ushort UDP::getEphemeralPort()
 {
     // start at the last allocated port number + 1, and search for an unused one
-    short searchUntil = lastEphemeralPort++;
+    ushort searchUntil = lastEphemeralPort++;
     if (lastEphemeralPort == EPHEMERAL_PORTRANGE_END) // wrap
         lastEphemeralPort = EPHEMERAL_PORTRANGE_START;
 
@@ -255,7 +255,7 @@ bool UDP::matchesSocket(SockDesc *sd, UDPPacket *udp, IPv6ControlInfo *ipCtrl)
     return true;
 }
 
-bool UDP::matchesSocket(SockDesc *sd, const IPvXAddress& localAddr, const IPvXAddress& remoteAddr, short remotePort)
+bool UDP::matchesSocket(SockDesc *sd, const IPvXAddress& localAddr, const IPvXAddress& remoteAddr, ushort remotePort)
 {
     return (sd->remotePort==0 || sd->remotePort!=remotePort) &&
            (sd->localAddr.isUnspecified() || sd->localAddr==localAddr) &&
@@ -328,38 +328,35 @@ void UDP::processICMPError(cPacket *msg)
     // extract details from the error message, then try to notify socket that sent bogus packet
     int type, code;
     IPvXAddress localAddr, remoteAddr;
-    int localPort, remotePort;
+    ushort localPort, remotePort;
 
     if (dynamic_cast<ICMPMessage *>(msg))
     {
         ICMPMessage *icmpMsg = (ICMPMessage *)msg;
         type = icmpMsg->getType();
         code = icmpMsg->getCode();
-        icmpMsg->setBitLength(icmpMsg->getEncapsulatedMsg()->getBitLength()); // trick because payload in ICMP is conceptually truncated
-        IPDatagram *datagram = check_and_cast<IPDatagram *>(icmpMsg->decapsulate());
+        // Note: we must NOT use decapsulate() because payload in ICMP is conceptually truncated
+        IPDatagram *datagram = check_and_cast<IPDatagram *>(icmpMsg->getEncapsulatedMsg());
+        UDPPacket *packet = check_and_cast<UDPPacket *>(datagram->getEncapsulatedMsg());
         localAddr = datagram->getSrcAddress();
         remoteAddr = datagram->getDestAddress();
-        UDPPacket *packet = check_and_cast<UDPPacket *>(datagram->decapsulate());
         localPort = packet->getSourcePort();
         remotePort = packet->getDestinationPort();
         delete icmpMsg;
-        delete datagram;
-        delete packet;
     }
     else if (dynamic_cast<ICMPv6Message *>(msg))
     {
         ICMPv6Message *icmpMsg = (ICMPv6Message *)msg;
         type = icmpMsg->getType();
         code = -1; // FIXME this is dependent on getType()...
-        IPv6Datagram *datagram = check_and_cast<IPv6Datagram *>(icmpMsg->decapsulate());
+        // Note: we must NOT use decapsulate() because payload in ICMP is conceptually truncated
+        IPv6Datagram *datagram = check_and_cast<IPv6Datagram *>(icmpMsg->getEncapsulatedMsg());
+        UDPPacket *packet = check_and_cast<UDPPacket *>(datagram->getEncapsulatedMsg());
         localAddr = datagram->getSrcAddress();
         remoteAddr = datagram->getDestAddress();
-        UDPPacket *packet = check_and_cast<UDPPacket *>(datagram->decapsulate());
         localPort = packet->getSourcePort();
         remotePort = packet->getDestinationPort();
         delete icmpMsg;
-        delete datagram;
-        delete packet;
     }
     EV << "ICMP error received: type=" << type << " code=" << code
        << " about packet " << localAddr << ":" << localPort << " > "
@@ -393,7 +390,7 @@ void UDP::processICMPError(cPacket *msg)
     sendUpErrorNotification(srcSocket, UDP_I_ERROR, localAddr, remoteAddr, remotePort);
 }
 
-void UDP::sendUpErrorNotification(SockDesc *sd, int msgkind, const IPvXAddress& localAddr, const IPvXAddress& remoteAddr, short remotePort)
+void UDP::sendUpErrorNotification(SockDesc *sd, int msgkind, const IPvXAddress& localAddr, const IPvXAddress& remoteAddr, ushort remotePort)
 {
     cPacket *notifyMsg = new cPacket("ERROR", msgkind);
     UDPControlInfo *udpCtrl = new UDPControlInfo();
