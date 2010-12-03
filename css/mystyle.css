@@ -1,7 +1,8 @@
 @media all
 {
   body {
-	font-size: 11pt;
+	/* font-size: 11pt; */
+	font-size: 10pt;
 	text-align: left;
 	line-height:1.2em;
   }
@@ -9,13 +10,13 @@
   h1 {font-size: 14pt;}
 
   #table-of-contents {
-	font-size: 85%;
+	font-size: 80%;
 	line-height: 1.4em;
   }
 
   #table-of-contents ul {
 	list-style: none;
-	margin: 7px 0px 7px 15px ;
+	margin: 0px 0px 7px 15px ;
 	padding: 0px;
   }
 
@@ -34,8 +35,9 @@
 	border-bottom: 1px solid #DDD;
   }
 
-  h3 {font-size: 11pt; color: #a34d32;}
-  h4 {font-size: 9pt;}
+  /* h3 {font-size: 11pt; color: #a34d32;} */
+  h3 {font-size: 11pt;}
+  h4 {font-size: 10pt; font-style: italic; font-weight: bold}
 
   a {text-decoration: none; color: #537d7b}
   /* a:visited {text-decoration: none; color: #224444} */ /* Taken out because color too similar to text. */
@@ -661,8 +663,9 @@
 	/* top: 180px; */
 	top: 35px;
 	width: 200px;
-	min-height:60px;
-	max-height:55%;
+	min-height:60px
+	/* max-height:55%; */
+	max-height:80%
 	overflow:auto;
   }
 
