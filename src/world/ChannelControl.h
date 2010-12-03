@@ -128,6 +128,9 @@ class INET_API ChannelControl : public cSimpleModule
     /** @brief Returns the channel the given host listens on */
     int getHostChannel(HostRef h) const {return h->channel;}
 
+	/** @brief un Registers the given host */
+	virtual bool unregisterHost(cModule *host);
+
     /** @brief Returns the "handle" of a previously registered host */
     virtual HostRef lookupHost(cModule *host);
 

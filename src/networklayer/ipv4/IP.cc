@@ -55,6 +55,24 @@ void IP::initialize()
     WATCH(numDropped);
     WATCH(numUnroutable);
     WATCH(numForwarded);
+    manetRouting=false;
+    int gateindex = mapping.getOutputGateForProtocol(IP_PROT_MANET);
+
+    if (gateSize("transportOut")-1<gateindex)
+    {
+           manetRouting=false;
+           return;
+    }
+
+    cGate *manetgate = gate("transportOut", gateindex)->getPathEndGate();
+    cModule *destmod = manetgate->getOwnerModule();
+
+    if (strstr (destmod->getName(),"manetmanager")!=NULL)
+    {
+       if (strncmp("OLSR", destmod->par("routingProtocol").stringValue(),4)!=0)
+           if((bool)destmod->par("manetActive"))
+                manetRouting=true; // Only for reactive, proactive protocols don't modify the performance of ip layer
+    }
 }
 
 void IP::updateDisplayString()
@@ -116,14 +134,19 @@ void IP::handlePacketFromNetwork(IPDatagram *datagram)
     }
 
     // remove control info
-    delete datagram->removeControlInfo();
+    if (datagram->getTransportProtocol()!=IP_PROT_DSR && datagram->getTransportProtocol()!=IP_PROT_MANET)
+    {
+        delete datagram->removeControlInfo();
+    }
+    else if (datagram->getMoreFragments())
+        delete datagram->removeControlInfo(); // delete all control message except the last
 
     // hop counter decrement; FIXME but not if it will be locally delivered
     datagram->setTimeToLive(datagram->getTimeToLive()-1);
 
     // route packet
     if (!datagram->getDestAddress().isMulticast())
-        routePacket(datagram, NULL, false);
+        routePacket(datagram, NULL, false,NULL);
     else
         routeMulticastPacket(datagram, NULL, getSourceInterfaceFrom(datagram));
 }
@@ -172,6 +195,10 @@ void IP::handleReceivedICMP(ICMPMessage *msg)
 
 void IP::handleMessageFromHL(cPacket *msg)
 {
+    InterfaceEntry *destIE=NULL; // will be filled in by encapsulate() or dsrFillDestIE
+    IPAddress nextHopAddress;
+    IPAddress *nextHopAddressPrt=NULL;
+
     // if no interface exists, do not send datagram
     if (ift->getNumInterfaces() == 0)
     {
@@ -180,24 +207,47 @@ void IP::handleMessageFromHL(cPacket *msg)
         return;
     }
 
+// if HL send a Ipdatagram routing the packet
+    if (dynamic_cast<IPDatagram *>(msg))
+    {
+        IPDatagram *datagram = check_and_cast  <IPDatagram *>(msg);
+// Dsr routing, Dsr is a HL protocol and send IPDatagram
+        dsrFillDestIE(datagram,destIE,nextHopAddress);
+        if (!nextHopAddress.isUnspecified())
+              nextHopAddressPrt=&nextHopAddress;
+        if (!datagram->getDestAddress().isMulticast())
+              routePacket(datagram, destIE, true,nextHopAddressPrt);
+        else
+               routeMulticastPacket(datagram, destIE, NULL);
+        return;
+    }
     // encapsulate and send
-    InterfaceEntry *destIE; // will be filled in by encapsulate()
-    IPDatagram *datagram = encapsulate(msg, destIE);
+
+
+    // encapsulate and send
+    IPControlInfo *controlInfo = check_and_cast<IPControlInfo*>(msg->removeControlInfo());
+    IPDatagram *datagram = encapsulate(msg, destIE,controlInfo);
+    nextHopAddress = controlInfo->getNextHopAddr();
+    delete controlInfo;
+    if (!nextHopAddress.isUnspecified())
+        nextHopAddressPrt=&nextHopAddress;
 
     // route packet
     if (!datagram->getDestAddress().isMulticast())
-        routePacket(datagram, destIE, true);
+        routePacket(datagram, destIE, true,nextHopAddressPrt);
     else
         routeMulticastPacket(datagram, destIE, NULL);
 }
 
-void IP::routePacket(IPDatagram *datagram, InterfaceEntry *destIE, bool fromHL)
+void IP::routePacket(IPDatagram *datagram, InterfaceEntry *destIE, bool fromHL,IPAddress* nextHopAddrPtr)
 {
     // TBD add option handling code here
 
     IPAddress destAddr = datagram->getDestAddress();
 
     EV << "Routing datagram `" << datagram->getName() << "' with dest=" << destAddr << ": ";
+
+    controlMessageToManetRouting(MANET_ROUTE_UPDATE,datagram);
 
     // check for local delivery
     if (rt->isLocalAddress(destAddr))
@@ -209,6 +259,32 @@ void IP::routePacket(IPDatagram *datagram, InterfaceEntry *destIE, bool fromHL)
         reassembleAndDeliver(datagram);
         return;
     }
+
+// broadcast limited address 255.255.255.255
+    if (destAddr == IPAddress::ALLONES_ADDRESS)
+    {
+        // check if local
+        if (!fromHL)
+        {
+            EV << "limited broadcast recived \n";
+            if (datagram->getSrcAddress().isUnspecified())
+                 datagram->setSrcAddress(destAddr); // allows two apps on the same host to communicate
+            numLocalDeliver++;
+            reassembleAndDeliver(datagram);
+        }
+        else
+        { // send limited broadcast packet
+            if (destIE!=NULL)
+               fragmentAndSend(datagram, destIE, IPAddress::ALLONES_ADDRESS);
+            else
+            {
+               numDropped++;
+               delete datagram;
+            }
+        }
+        return;
+    }
+
 
     // if datagram arrived from input gate and IP_FORWARD is off, delete datagram
     if (!fromHL && !rt->isIPForwardingEnabled())
@@ -226,20 +302,37 @@ void IP::routePacket(IPDatagram *datagram, InterfaceEntry *destIE, bool fromHL)
     {
         EV << "using manually specified output interface " << destIE->getName() << "\n";
         // and nextHopAddr remains unspecified
+        if (manetRouting  && fromHL && nextHopAddrPtr)
+           nextHopAddr = *nextHopAddrPtr;  // Manet DSR routing explicit route
     }
     else
     {
         // use IP routing (lookup in routing table)
         const IPRoute *re = rt->findBestMatchingRoute(destAddr);
 
+        if (re!=NULL && re->getSource()== IPRoute::MANET)
+        {
+// special case the address must agree
+           if (re->getHost()!=destAddr)
+               re=NULL;
+        }
+
         // error handling: destination address does not exist in routing table:
         // notify ICMP, throw packet away and continue
         if (re==NULL)
         {
-            EV << "unroutable, sending ICMP_DESTINATION_UNREACHABLE\n";
-            numUnroutable++;
-            icmpAccess.get()->sendErrorMessage(datagram, ICMP_DESTINATION_UNREACHABLE, 0);
-            return;
+            if (manetRouting==false)
+            {
+               EV << "unroutable, sending ICMP_DESTINATION_UNREACHABLE\n";
+               numUnroutable++;
+               icmpAccess.get()->sendErrorMessage(datagram, ICMP_DESTINATION_UNREACHABLE, 0);
+               return;
+            }
+            else
+            {
+               controlMessageToManetRouting(MANET_ROUTE_NOROUTE,datagram);
+               return;
+            }
         }
 
         // extract interface and next-hop address from routing table entry
@@ -258,6 +351,12 @@ void IP::routePacket(IPDatagram *datagram, InterfaceEntry *destIE, bool fromHL)
     //
     // fragment and send the packet
     //
+    if (datagram->getTransportProtocol()==IP_PROT_MANET)
+    {
+       //  check control Info
+       if (datagram->getControlInfo())
+             delete datagram->removeControlInfo();
+    }
     fragmentAndSend(datagram, destIE, nextHopAddr);
 }
 
@@ -363,6 +462,12 @@ void IP::routeMulticastPacket(IPDatagram *datagram, InterfaceEntry *destIE, Inte
 
 void IP::reassembleAndDeliver(IPDatagram *datagram)
 {
+   // If the protocol is Dsr Send directely the datagram to manet routing
+    if ( datagram->getTransportProtocol()==IP_PROT_DSR)
+    {
+        controlMessageToManetRouting(MANET_ROUTE_NOROUTE,datagram);
+        return;
+    }
     // reassemble the packet (if fragmented)
     if (datagram->getFragmentOffset()!=0 || datagram->getMoreFragments())
     {
@@ -419,6 +524,7 @@ cPacket *IP::decapsulateIP(IPDatagram *datagram)
     controlInfo->setDestAddr(datagram->getDestAddress());
     controlInfo->setDiffServCodePoint(datagram->getDiffServCodePoint());
     controlInfo->setInterfaceId(fromIE ? fromIE->getInterfaceId() : -1);
+    controlInfo->setTimeToLive(datagram->getTimeToLive());
 
     // original IP datagram might be needed in upper layers to send back ICMP error message
     controlInfo->setOrigDatagram(datagram);
@@ -545,6 +651,8 @@ IPDatagram *IP::encapsulate(cPacket *transportPacket, InterfaceEntry *&destIE, I
         ttl = defaultTimeToLive;
 
     datagram->setTimeToLive(ttl);
+
+
     datagram->setTransportProtocol(controlInfo->getProtocol());
 
     // setting IP options is currently not supported
@@ -576,5 +684,65 @@ void IP::sendDatagramToOutput(IPDatagram *datagram, InterfaceEntry *ie, IPAddres
 
     send(datagram, queueOutGate);
 }
+
+void IP::controlMessageToManetRouting(int code,IPDatagram *datagram)
+{
+    ControlManetRouting *control;
+	if (!manetRouting)
+        	return;
+
+	if (datagram->getTransportProtocol()==IP_PROT_DSR)
+	{
+		if (code==MANET_ROUTE_NOROUTE)
+		{
+			int gateindex = mapping.getOutputGateForProtocol(IP_PROT_MANET);
+			send(datagram, "transportOut", gateindex);
+		}
+		return; // Dsr don't use update code, the Dsr datagram is the update.
+	}
+
+
+	control = new ControlManetRouting();
+	control->setOptionCode(code);
+
+	switch (code)
+	{
+	case MANET_ROUTE_UPDATE:
+		control->setSrcAddress(datagram->getSrcAddress());
+		control->setDestAddress(datagram->getDestAddress());
+		break;
+	case MANET_ROUTE_NOROUTE:
+		control->setSrcAddress(datagram->getSrcAddress());
+		control->setDestAddress(datagram->getDestAddress());
+		control->encapsulate(datagram);
+		break;
+	default:
+		delete control;
+		return;
+	}
+	int gateindex = mapping.getOutputGateForProtocol(IP_PROT_MANET);
+	send(control, "transportOut", gateindex);
+}
+
+void IP::dsrFillDestIE(IPDatagram *datagram, InterfaceEntry *&destIE,IPAddress &nextHopAddress)
+{
+
+    nextHopAddress= IPAddress::UNSPECIFIED_ADDRESS;
+
+    if (datagram->getTransportProtocol()!=IP_PROT_DSR)
+		return; // Not Dsr packet
+
+    IPControlInfo *controlInfo = check_and_cast<IPControlInfo*>(datagram->removeControlInfo());
+    if (controlInfo==NULL)
+		return; // Not contolInfo
+
+    destIE = ift->getInterfaceById(controlInfo->getInterfaceId());
+
+    nextHopAddress  = controlInfo->getNextHopAddr();
+    delete controlInfo;
+
+}
+
+
 
 

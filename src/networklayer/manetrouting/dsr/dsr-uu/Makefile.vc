@@ -1,0 +1,77 @@
+
+
+!include "../../../../inetconfig.vc"
+
+SOURCES = dsr-pkt.c dsr-io.c dsr-opt.c dsr-rreq.c dsr-rrep.c dsr-rerr.c dsr-ack.c dsr-srt.c send-buf.c neigh.c maint-buf.c link-cache.c path-cache.c
+OBJECTS = dsr-pkt.obj dsr-io.obj dsr-opt.obj dsr-rreq.obj dsr-rrep.obj \
+	dsr-rerr.obj dsr-ack.obj dsr-srt.obj send-buf.obj neigh.obj \
+	maint-buf.obj link-cache.obj path-cache.obj
+HEADERS =dsr-pkt.h dsr-io.h dsr-opt.h dsr-rreq.h dsr-rrep.h dsr-rerr.h \
+         dsr-ack.h dsr-srt.h send-buf.h neigh.h maint-buf.h link-cache.h \
+         compatibility.h debug.h dsr.h endian.h list.h tbl.h timer.h
+
+
+MODNAME=dsr
+RTC_TRG=linkcache
+RTC_SRC=link-cache.c
+
+
+INCLUDES = -I. -I../../../../Transport/Contract -I../../../Contract -I../../../../NetworkInterfaces/Contract -I../../../../Base -I../../../../Util -I../../../IPv4 -I../../../Contract -I../../../AutoRouting -I../../../Queue  -I../../../../Transport/UDP -I../../../../NetworkInterfaces -I../../../../Nodes/INET -I../. -I$(OMNETPP_INCL_DIR)
+
+
+OMNET_DEFS= /DOMNETPP /nologo /Zi 
+
+
+CFLAGS=$(OPTS) $(CPP_OPTS) $(DEBUG) $(INCLUDES)  $(OMNET_DEFS) $(EXTRA_OMNET_DEFS) /TP /EHs 
+
+
+OMNET_INC= $(INCLUDE_PATH) # 
+
+OMNET_TARGET=libdsr_uu.lib
+
+all:libdsr_uu.lib
+libdsr_uu.lib: $(OBJECTS) $(HEADERS) $(SOURCES)
+	link.exe /lib $(OBJECTS) $(LDFLAGS) /OUT:libdsr_uu.lib
+
+
+clean:
+	-del *.obj libdsr_uu.lib vc80.pdb vc80.idb
+
+# DO NOT DELETE
+
+dsr-module.obj: dsr.h ./endian.h dsr-pkt.h timer.h dsr-dev.h dsr-io.h debug.h
+dsr-module.obj: neigh.h dsr-rreq.h dsr-rrep.h dsr-srt.h maint-buf.h send-buf.h
+dsr-module.obj: link-cache.h tbl.h list.h
+dsr-pkt.obj: debug.h dsr-opt.h dsr.h ./endian.h dsr-pkt.h timer.h
+dsr-dev.obj: debug.h dsr.h ./endian.h dsr-pkt.h timer.h neigh.h dsr-opt.h
+dsr-dev.obj: dsr-rreq.h link-cache.h tbl.h list.h dsr-srt.h dsr-ack.h
+dsr-dev.obj: send-buf.h maint-buf.h dsr-io.h
+dsr-io.obj: dsr.h ./endian.h dsr-pkt.h timer.h dsr-rreq.h dsr-rrep.h dsr-srt.h
+dsr-io.obj: debug.h dsr-ack.h dsr-rtc.h maint-buf.h neigh.h dsr-opt.h
+dsr-io.obj: link-cache.h tbl.h list.h send-buf.h
+dsr-opt.obj: debug.h dsr.h ./endian.h dsr-pkt.h timer.h dsr-opt.h dsr-rreq.h
+dsr-opt.obj: dsr-rrep.h dsr-srt.h dsr-rerr.h dsr-ack.h
+dsr-rreq.obj: debug.h dsr.h ./endian.h dsr-pkt.h timer.h tbl.h list.h
+dsr-rreq.obj: dsr-rrep.h dsr-srt.h dsr-rreq.h dsr-opt.h link-cache.h send-buf.h
+dsr-rreq.obj: neigh.h
+dsr-rrep.obj: dsr.h ./endian.h dsr-pkt.h timer.h debug.h tbl.h list.h
+dsr-rrep.obj: dsr-rrep.h dsr-srt.h dsr-rreq.h dsr-opt.h link-cache.h send-buf.h
+dsr-rerr.obj: dsr.h ./endian.h dsr-pkt.h timer.h dsr-rerr.h dsr-opt.h debug.h
+dsr-rerr.obj: dsr-srt.h dsr-ack.h link-cache.h tbl.h list.h maint-buf.h
+dsr-ack.obj: tbl.h list.h debug.h dsr-opt.h dsr.h ./endian.h dsr-pkt.h timer.h
+dsr-ack.obj: dsr-ack.h link-cache.h neigh.h maint-buf.h
+dsr-srt.obj: dsr.h ./endian.h dsr-pkt.h timer.h dsr-srt.h debug.h dsr-opt.h
+dsr-srt.obj: dsr-ack.h link-cache.h tbl.h list.h neigh.h dsr-rrep.h
+send-buf.obj: tbl.h list.h send-buf.h dsr.h ./endian.h dsr-pkt.h timer.h
+send-buf.obj: debug.h link-cache.h dsr-srt.h
+debug.obj: debug.h dsr.h ./endian.h dsr-pkt.h timer.h
+neigh.obj: tbl.h list.h neigh.h dsr.h ./endian.h dsr-pkt.h timer.h debug.h
+maint-buf.obj: dsr.h ./endian.h dsr-pkt.h timer.h debug.h tbl.h list.h neigh.h
+maint-buf.obj: dsr-ack.h link-cache.h dsr-rerr.h dsr-dev.h dsr-srt.h dsr-opt.h
+maint-buf.obj: maint-buf.h ../dsr-uu-omnetpp.h send-buf.h dsr-rreq.h dsr-rrep.h
+maint-buf.obj: ../dsr-pkt_omnet.h dsr-io.h
+
+
+generateheaders: # target invoked by OMNeT++-generated uplevel Makefile.vc; does nothing for now
+
+depend:	# target invoked by OMNeT++-generated uplevel Makefile.vc; does nothing for now

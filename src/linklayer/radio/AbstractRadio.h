@@ -133,9 +133,20 @@ class INET_API AbstractRadio : public ChannelAccess
      */
     virtual IRadioModel *createRadioModel() = 0;
 
+    /** @brief updates the sensitivity value if the bitrate varies */
+    virtual void updateSensitivity(double bitrate);
+
   protected:
     IRadioModel *radioModel;
     IReceptionModel *receptionModel;
+
+    /** @name Statistics */
+    //@{
+    long numGivenUp;
+    long numReceivedCorrectly;
+    double lossRate;
+    cOutVector lostVector;
+    //@}
 
     /** Power used to transmit messages */
     double transmitterPower;

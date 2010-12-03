@@ -167,7 +167,11 @@ class INET_API IRoutingTable
      */
     virtual std::vector<IPAddress> gatherAddresses() const = 0;
     //@}
-
+   // Dsdv time to live test entry
+    virtual void setTimeToLiveRoutingEntry(simtime_t a) = 0;
+    virtual simtime_t getTimeToLiveRoutingEntry()=0;
+    virtual void dsdvTestAndDelete() = 0;
+    virtual const bool testValidity(const IPRoute *entry) const = 0;
 };
 
 #endif

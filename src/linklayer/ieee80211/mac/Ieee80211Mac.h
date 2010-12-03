@@ -226,6 +226,8 @@ class INET_API Ieee80211Mac : public WirelessMacBase, public INotifiable
     long numReceived;
     long numSentBroadcast;
     long numReceivedBroadcast;
+    long numAckSend;
+	long numReceivedOther;
     cOutVector stateVector;
     cOutVector radioStateVector;
     //@}
@@ -249,6 +251,7 @@ class INET_API Ieee80211Mac : public WirelessMacBase, public INotifiable
     virtual void initialize(int);
     virtual void registerInterface();
     virtual void initializeQueueModule();
+    virtual void finish();
     //@}
 
   protected:

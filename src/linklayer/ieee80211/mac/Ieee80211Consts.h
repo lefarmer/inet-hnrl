@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2006 Levente Mészáros
+// Copyright (C) 2006 Levente Mï¿½szï¿½ros
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public License
@@ -33,6 +33,7 @@ const unsigned int LENGTH_ACK = 112;
 // time slot ST, short interframe space SIFS, distributed interframe
 // space DIFS, and extended interframe space EIFS
 
+#ifndef IEEE80211A
 const_simtime_t ST = 20E-6;
 const_simtime_t SIFS = 10E-6;
 const_simtime_t DIFS = 2 * ST + SIFS;
@@ -50,6 +51,7 @@ const int PHY_HEADER_LENGTH = 192;
 const int HEADER_WITHOUT_PREAMBLE = 48;
 const double BITRATE_HEADER = 1E+6;
 const double BANDWIDTH = 2E+6;
+#endif
 
 #endif
 

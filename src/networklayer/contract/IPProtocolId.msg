@@ -46,6 +46,7 @@ enum IPProtocolId
     IP_PROT_IPv6_MOBILITY = 62;
     IP_PROT_OSPF = 89;
     IP_PROT_SCTP = 132;
+    IP_PROT_DSR  = 135; //
     IP_PROT_MANET = 254; //XXX Use for simplicity
 
     IP_PROT_IPv6EXT_HOP = 0;       // Hop-by-hop option header.

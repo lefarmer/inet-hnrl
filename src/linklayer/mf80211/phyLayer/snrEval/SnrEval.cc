@@ -439,6 +439,8 @@ void SnrEval::changeChannel(int channel)
     // if we are currently receiving, must clean that up before moving to different channel
     if (rs.getState() == RadioState::RECV)
     {
+		EV<<"Radio State is in RECV. Setting it to IDLE"<<endl; //Zarrar Yousaf patch 01/27/2009
+        rs.setState(RadioState::IDLE); // Zarrar Yousaf Patch 01/27/2009
         // delete messages being received, and cancel associated self-messages
         for (RecvBuff::iterator it = recvBuff.begin(); it!=recvBuff.end(); ++it)
         {

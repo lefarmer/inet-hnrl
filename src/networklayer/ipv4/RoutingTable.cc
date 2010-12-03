@@ -46,6 +46,8 @@ std::ostream& operator<<(std::ostream& os, const IPRoute& e)
 
 RoutingTable::RoutingTable()
 {
+ // DSDV 
+    timetolive_routing_entry = timetolive_routing_entry.getMaxTime();
 }
 
 RoutingTable::~RoutingTable()
@@ -314,14 +316,63 @@ bool RoutingTable::isLocalMulticastAddress(const IPAddress& dest) const
     return false;
 }
 
+void RoutingTable::dsdvTestAndDelete()
+{
+     if (timetolive_routing_entry==timetolive_routing_entry.getMaxTime())
+           return;
+     for (RouteVector::iterator i=routes.begin(); i!=routes.end(); ++i)
+     {
+
+           IPRoute *e = *i;
+           if (this->isLocalAddress(e->getHost()))
+                     continue;
+           if (((e->getHost()).str() != "*") && ((e->getHost()).str() != "<unspec>") && ((e->getHost()).str() != "127.0.0.1") && (simTime()-(e->getInstallTime()))>timetolive_routing_entry){
+                //EV << "Routes ends at" << routes.end() <<"\n";
+                deleteRoute(e);
+                //EV << "After deleting Routes ends at" << routes.end() <<"\n";
+                EV << "Deleting entry ip=" << e->getHost().str() <<"\n";
+                i--;
+           }
+      }
+
+}
+
+const bool RoutingTable::testValidity(const IPRoute *entry) const
+{
+     if (timetolive_routing_entry==timetolive_routing_entry.getMaxTime())
+           return true;
+     if (this->isLocalAddress(entry->getHost()))
+           return true;
+     if (((entry->getHost()).str() != "*") && ((entry->getHost()).str() != "<unspec>") && ((entry->getHost()).str() != "127.0.0.1") && (simTime()-(entry->getInstallTime()))>timetolive_routing_entry){
+                return false;
+      }
+      return true;
+
+}
 
 const IPRoute *RoutingTable::findBestMatchingRoute(const IPAddress& dest) const
 {
-    Enter_Method("findBestMatchingRoute(%u.%u.%u.%u)", dest.getDByte(0), dest.getDByte(1), dest.getDByte(2), dest.getDByte(3)); // note: str().c_str() too slow here
-
+    Enter_Method("findBestMatchingRoute(%x)", dest.getInt()); // note: str().c_str() too slow here
     RoutingCache::iterator it = routingCache.find(dest);
+
     if (it != routingCache.end())
-        return it->second;
+    {
+        if (it->second==NULL)
+        {
+              routingCache.clear();
+              localAddresses.clear();
+        }
+        else if (testValidity(it->second))
+	{
+	    if (it->second->getSource()==IPRoute::MANET)
+            {
+	         if (IPAddress::maskedAddrAreEqual(dest, it->second->getHost(), IPAddress::ALLONES_ADDRESS))
+                    return it->second;
+	     }
+             else
+                 return it->second;
+	}
+    }
 
     // find best match (one with longest prefix)
     // default route has zero prefix length, so (if exists) it'll be selected as last resort
@@ -329,14 +380,37 @@ const IPRoute *RoutingTable::findBestMatchingRoute(const IPAddress& dest) const
     uint32 longestNetmask = 0;
     for (RouteVector::const_iterator i=routes.begin(); i!=routes.end(); ++i)
     {
-        const IPRoute *e = *i;
-        if (IPAddress::maskedAddrAreEqual(dest, e->getHost(), e->getNetmask()) &&  // match
-            (!bestRoute || e->getNetmask().getInt() > longestNetmask))  // longest so far
+        IPRoute *e = *i;
+        if (testValidity(e))
         {
-            bestRoute = e;
-            longestNetmask = e->getNetmask().getInt();
+           if (IPAddress::maskedAddrAreEqual(dest, e->getHost(), e->getNetmask()) &&  // match
+               (!bestRoute || e->getNetmask().getInt() > longestNetmask))  // longest so far
+           {
+              bestRoute = e;
+              longestNetmask = e->getNetmask().getInt();
+           }
         }
     }
+    
+    if (bestRoute && bestRoute->getSource()==IPRoute::MANET && bestRoute->getHost()!=dest)
+    {
+        bestRoute=NULL;
+        /* in this case we must find the mask must be 255.255.255.255 route */
+        for (RouteVector::const_iterator i=routes.begin(); i!=routes.end(); ++i)
+        {
+           IPRoute *e = *i;
+           if (testValidity(e))
+           {
+              if (IPAddress::maskedAddrAreEqual(dest, e->getHost(), IPAddress::ALLONES_ADDRESS) &&  // match
+               (!bestRoute || e->getNetmask().getInt()>longestNetmask))  // longest so far
+              {
+                 bestRoute = e;
+                 longestNetmask = e->getNetmask().getInt();
+              }
+           }
+        }
+    }
+
     routingCache[dest] = bestRoute;
     return bestRoute;
 }

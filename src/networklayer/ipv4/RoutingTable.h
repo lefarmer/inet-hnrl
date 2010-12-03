@@ -78,6 +78,8 @@ class INET_API RoutingTable: public cSimpleModule, public IRoutingTable, protect
     IPAddress routerId;
     bool IPForward;
 
+    // DSDV parameters
+    simtime_t timetolive_routing_entry;
     //
     // Routes:
     //
@@ -116,6 +118,8 @@ class INET_API RoutingTable: public cSimpleModule, public IRoutingTable, protect
 
     // invalidates routing cache and local addresses cache
     virtual void invalidateCache();
+
+
 
   public:
     RoutingTable();
@@ -257,6 +261,11 @@ class INET_API RoutingTable: public cSimpleModule, public IRoutingTable, protect
      */
     virtual std::vector<IPAddress> gatherAddresses() const;
     //@}
+    virtual void setTimeToLiveRoutingEntry(simtime_t a){timetolive_routing_entry = a;}
+    virtual simtime_t getTimeToLiveRoutingEntry(){return timetolive_routing_entry;}
+    // Dsdv time to live test entry
+    virtual void dsdvTestAndDelete();
+    virtual const bool testValidity(const IPRoute *entry) const;
 
 };
 

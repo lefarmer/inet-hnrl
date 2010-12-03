@@ -1,0 +1,48 @@
+# Makefile
+
+
+!include "../../../../inetconfig.vc"
+
+SOURCES = 	debug.c dymo_generic.c dymo_re.c dymo_socket.c dymo_timeout.c \
+         dymo_uerr.c dymo_rerr.c rtable.c timer_queue.c pending_rreq.c \
+         icmp_socket.c blacklist.c dymo_nb.c dymo_hello.c
+
+
+OBJECTS= 	debug.obj dymo_generic.obj dymo_re.obj dymo_socket.obj dymo_timeout.obj \
+         dymo_uerr.obj dymo_rerr.obj rtable.obj timer_queue.obj pending_rreq.obj \
+         icmp_socket.obj blacklist.obj dymo_nb.obj dymo_hello.obj
+
+
+HEADERS = blacklist.h debug.h defs.h  dlist.h dymo_generic.h dymo_re.h dymo_socket.h \
+          dymo_timeout.h dymo_uerr.h dymo_rerr.h rtable.h timer_queue.h pending_rreq.h \
+         icmp_socket.h  dymo_nb.h dymo_hello.h 
+
+
+INCLUDES = -I. -I../../../../Transport/Contract -I../../../Contract -I../../../../NetworkInterfaces/Contract -I../../../../Base -I../../../../Util -I../../../IPv4 -I../../../Contract -I../../../AutoRouting -I../../../Queue  -I../../../../Transport/UDP -I../../../../NetworkInterfaces -I../../../../Nodes/INET -I../. -I$(OMNETPP_INCL_DIR)
+
+# Compiler and options:
+OPTS= /nologo -DOMNETPP -DNS_PORT $(INCLUDES) /TP /EHs 
+
+
+CPP_OPTS=
+
+# Comment out to disable debug operation...
+DEBUG= 
+# Add extra functionality. Uncomment or use "make XDEFS=-D<feature>" on 
+# the command line.
+XDEFS=
+DEFS=#-DCONFIG_GATEWAY #-DLLFEEDBACK
+CFLAGS=$(OPTS) $(DEBUG) $(DEFS) $(XDEFS)
+
+all:libdymo_um.lib
+libdymo_um.lib: $(OBJECTS) $(HEADERS) $(SOURCES)
+	link.exe /lib $(OBJECTS) $(LDFLAGS) /OUT:libdymo_um.lib
+
+
+clean: 
+	-del *.obj libdymo_um.lib vc80.pdb vc80.idb
+
+generateheaders: # target invoked by OMNeT++-generated uplevel Makefile.vc; does nothing for now
+
+depend:	# target invoked by OMNeT++-generated uplevel Makefile.vc; does nothing for now
+

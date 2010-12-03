@@ -95,6 +95,7 @@ void Ieee80211MgmtBase::handleMessage(cMessage *msg)
                   pk->getClassName(), pk->getName(), (int)(pk->getByteLength()));
 
         handleUpperMessage(pk);
+
     }
 }
 
@@ -163,7 +164,8 @@ cPacket *Ieee80211MgmtBase::decapsulate(Ieee80211DataFrame *frame)
     cPacket *payload = frame->decapsulate();
 
     Ieee802Ctrl *ctrl = new Ieee802Ctrl();
-    ctrl->setSrc(frame->getAddress3());
+    //ctrl->setSrc(frame->getAddress3());
+    ctrl->setSrc(frame->getTransmitterAddress());
     ctrl->setDest(frame->getReceiverAddress());
     payload->setControlInfo(ctrl);
 
@@ -222,6 +224,14 @@ void Ieee80211MgmtBase::processFrame(Ieee80211DataOrMgmtFrame *frame)
       case ST_PROBERESPONSE:
         numMgmtFramesReceived++;
         handleProbeResponseFrame(check_and_cast<Ieee80211ProbeResponseFrame *>(frame));
+        break;
+      case ST_LBMS_REQUEST:
+        numMgmtFramesReceived++;
+        handleLbmsRequestFrame(check_and_cast<Ieee80211LBMSRequest *>(frame));
+        break;
+      case ST_LBMS_REPORT:
+        numMgmtFramesReceived++;
+        handleLbmsReportFrame(check_and_cast<Ieee80211LBMSReport *>(frame));
         break;
       default:
         error("unexpected frame type (%s)%s", frame->getClassName(), frame->getName());

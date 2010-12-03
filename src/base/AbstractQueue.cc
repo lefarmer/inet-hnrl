@@ -79,7 +79,7 @@ void AbstractQueue::doEndService()
     }
     else
     {
-        msgServiced = queue.pop();
+        msgServiced = (cMessage *)queue.pop();
         doStartService();
     }
 }

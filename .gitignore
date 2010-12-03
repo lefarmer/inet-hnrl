@@ -1,35 +1,22 @@
-# ignore generated files
+# ignore files generated from messages
 *_m.h
 *_m.cc
-src/Makefile
-/doc/doxy/
-/doc/neddoc/
 
-# ignore binary files
+# ignore binary result files
 out/
 *.so
-*.dylib
-*.dll
 *.a
-*.lib
 *.exe
 *.o
 *.obj
-*.pdb
-*.idb
-*.manifest
 .tkenvrc
 
-# ignore backup and temp files
-*.bak
-backups
-*~
-xxx
-/3rdparty
-/tmp/
+# ignore project specific files
+src/Makefile
 
 # added by Joseph Kim
 doc/doxy
+doc/neddoc/
 *.anf
 *.dly
 *.ecr

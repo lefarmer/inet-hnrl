@@ -46,7 +46,7 @@ class SomeUDPApp : public UDPAppBase
     // chooses random destination address
     virtual IPvXAddress chooseDestAddr();
     virtual void sendPacket();
-    virtual void processPacket(cMessage *msg);
+    virtual void processPacket(cPacket *msg);
 
   protected:
     virtual int numInitStages() const {return 4;}

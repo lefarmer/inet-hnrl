@@ -114,7 +114,16 @@ void EtherEncap::processFrameFromMAC(EtherFrame *frame)
     Ieee802Ctrl *etherctrl = new Ieee802Ctrl();
     etherctrl->setSrc(frame->getSrc());
     etherctrl->setDest(frame->getDest());
+
+    //Stephan Janosch patch
+    EthernetIIFrame * e2frame = dynamic_cast<EthernetIIFrame *>(frame);
+    if (e2frame)
+    	etherctrl->setEtherType(e2frame->getEtherType());
+    // end Stephan Janosch pathc
+
     higherlayermsg->setControlInfo(etherctrl);
+
+
 
     EV << "Decapsulating frame `" << frame->getName() <<"', passing up contained "
           "packet `" << higherlayermsg->getName() << "' to higher layer\n";

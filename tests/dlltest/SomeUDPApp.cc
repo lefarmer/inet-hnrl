@@ -71,8 +71,8 @@ void SomeUDPApp::sendPacket()
     char msgName[32];
     sprintf(msgName,"SomeUDPAppData-%d", counter++);
 
-    cMessage *payload = new cMessage(msgName);
-    payload->setLength(msgLength);
+    cPacket *payload = new cPacket(msgName);
+    payload->setBitLength(msgLength);
 
     IPvXAddress destAddr = chooseDestAddr();
     sendToUDP(payload, localPort, destAddr, destPort);
@@ -91,19 +91,19 @@ void SomeUDPApp::handleMessage(cMessage *msg)
     else
     {
         // process incoming packet
-        processPacket(msg);
+        processPacket(PK(msg));
     }
 
     if (ev.isGUI())
     {
         char buf[40];
         sprintf(buf, "rcvd: %d pks\nsent: %d pks", numReceived, numSent);
-        displayString().setTagArg("t",0,buf);
+        getDisplayString().setTagArg("t",0,buf);
     }
 }
 
 
-void SomeUDPApp::processPacket(cMessage *msg)
+void SomeUDPApp::processPacket(cPacket *msg)
 {
     EV << "Received packet: ";
     printPacket(msg);

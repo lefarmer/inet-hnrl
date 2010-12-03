@@ -49,6 +49,7 @@ class INET_API IPRoute : public cPolymorphic
         OSPF,         ///< managed by the given routing protocol
         BGP,          ///< managed by the given routing protocol
         ZEBRA,        ///< managed by the Quagga/Zebra based model
+        MANET,        ///< managed by manet
     };
 
   protected:
@@ -59,6 +60,12 @@ class INET_API IPRoute : public cPolymorphic
     RouteType type;     ///< direct or remote
     RouteSource source; ///< manual, routing prot, etc.
     int metric;         ///< Metric ("cost" to reach the destination)
+// DSDV protocol 
+    //Originated from destination.Ensures loop freeness.
+    unsigned int sequencenumber;	
+    //Time of routing table entry creation 
+    simtime_t installtime;
+
 
   private:
     // copying not supported: following are private and also left undefined
@@ -102,6 +109,12 @@ class INET_API IPRoute : public cPolymorphic
 
     /** "Cost" to reach the destination */
     int getMetric() const {return metric;}
+
+    simtime_t getInstallTime() const {return installtime;}
+    void setInstallTime(simtime_t time) {installtime = time;}
+    void setSequencenumber(int i){sequencenumber =i;}
+    unsigned int getSequencenumber() const {return sequencenumber;}
+
 };
 
 #endif

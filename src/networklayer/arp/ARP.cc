@@ -36,36 +36,66 @@ static std::ostream& operator<< (std::ostream& out, const ARP::ARPCacheEntry& e)
     return out;
 }
 
+ARP::ARPCache ARP::globalArpCache;
 
 Define_Module (ARP);
 
-void ARP::initialize()
+void ARP::initialize(int stage)
 {
-    ift = InterfaceTableAccess().get();
-    rt = RoutingTableAccess().get();
+    if (stage==0)
+          globalArpCache.clear();
 
-    nicOutBaseGateId = gateSize("nicOut")==0 ? -1 : gate("nicOut",0)->getId();
+    if (stage==4)
+    {
+       ift = InterfaceTableAccess().get();
+       rt = RoutingTableAccess().get();
 
-    retryTimeout = par("retryTimeout");
-    retryCount = par("retryCount");
-    cacheTimeout = par("cacheTimeout");
-    doProxyARP = par("proxyARP");
+       nicOutBaseGateId = gateSize("nicOut")==0 ? -1 : gate("nicOut",0)->getId();
 
-    pendingQueue.setName("pendingQueue");
+       retryTimeout = par("retryTimeout");
+       retryCount = par("retryCount");
+       cacheTimeout = par("cacheTimeout");
+       doProxyARP = par("proxyARP");
+       globalARP = par("globalARP");
+
+       pendingQueue.setName("pendingQueue");
 
     // init statistics
-    numRequestsSent = numRepliesSent = 0;
-    numResolutions = numFailedResolutions = 0;
-    WATCH(numRequestsSent);
-    WATCH(numRepliesSent);
-    WATCH(numResolutions);
-    WATCH(numFailedResolutions);
+       numRequestsSent = numRepliesSent = 0;
+       numResolutions = numFailedResolutions = 0;
+       WATCH(numRequestsSent);
+       WATCH(numRepliesSent);
+       WATCH(numResolutions);
+       WATCH(numFailedResolutions);
 
-    WATCH_PTRMAP(arpCache);
+       WATCH_PTRMAP(arpCache);
+       WATCH_PTRMAP(globalArpCache);
+
+// initialize global cache 
+       for (int i=0;i<ift->getNumInterfaces();i++)
+       {
+           InterfaceEntry *ie = ift->getInterface(i);
+           if (ie->isLoopback())
+              continue;
+           ARPCacheEntry *entry = new ARPCacheEntry();
+           entry->ie = ie;
+           entry->pending = false;
+           entry->timer = NULL;
+           entry->numRetries = 0;
+           entry->macAddress = ie->getMacAddress();
+           IPAddress nextHopAddr = ie->ipv4Data()->getIPAddress();
+           ARPCache::iterator where = globalArpCache.insert(globalArpCache.begin(), std::make_pair(nextHopAddr,entry));
+           entry->myIter = where; // note: "inserting a new element into a map does not invalidate iterators that point to existing elements"
+
+       }
+    }
+
 }
 
 void ARP::finish()
 {
+    if (globalARP)
+       return;
     recordScalar("ARP requests sent", numRequestsSent);
     recordScalar("ARP replies sent", numRepliesSent);
     recordScalar("ARP resolutions", numResolutions);
@@ -79,6 +109,12 @@ ARP::~ARP()
         ARPCache::iterator i = arpCache.begin();
         delete (*i).second;
         arpCache.erase(i);
+    }
+    while (!globalArpCache.empty())
+    {
+        ARPCache::iterator i = globalArpCache.begin();
+        delete (*i).second;
+        globalArpCache.erase(i);
     }
 }
 
@@ -149,7 +185,10 @@ void ARP::processOutboundPacket(cMessage *msg)
     // more than one host group address may map to the same Ethernet multicast
     // address."
     //
-    if (nextHopAddr.isMulticast())
+    
+
+    //    if (nextHopAddr.isMulticast())
+    if (nextHopAddr.isMulticast() || nextHopAddr == IPAddress::ALLONES_ADDRESS) // also include all nodes
     {
         // FIXME: we do a simpler solution right now: send to the Broadcast MAC address
         EV << "destination address is multicast, sending packet to broadcast MAC address\n";
@@ -171,6 +210,16 @@ void ARP::processOutboundPacket(cMessage *msg)
         sendPacketToNIC(msg, ie, multicastMacAddr);
         return;
 #endif
+    }
+
+    if (globalARP)
+    {
+        ARPCache::iterator it = globalArpCache.find(nextHopAddr);
+        if (it==globalArpCache.end())
+             opp_error("Addres not found in global");
+        else
+             sendPacketToNIC(msg, ie, (*it).second->macAddress);
+        return;
     }
 
     // try look up

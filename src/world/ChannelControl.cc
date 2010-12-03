@@ -155,6 +155,20 @@ ChannelControl::HostRef ChannelControl::registerHost(cModule *host, const Coord&
     return &hosts.back(); // last element
 }
 
+bool ChannelControl::unregisterHost(cModule * host)
+{
+	Enter_Method_Silent();
+    for (HostList::iterator it = hosts.begin(); it != hosts.end(); it++)
+        if (it->host == host)
+		{
+			hosts.erase(it);
+            return true;
+		}
+    return false;
+
+
+}
+
 ChannelControl::HostRef ChannelControl::lookupHost(cModule *host)
 {
     Enter_Method_Silent();

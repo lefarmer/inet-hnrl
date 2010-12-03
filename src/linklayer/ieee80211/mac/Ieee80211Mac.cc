@@ -21,6 +21,7 @@
 #include "IInterfaceTable.h"
 #include "InterfaceTableAccess.h"
 #include "PhyControlInfo_m.h"
+#include "ControlInfoBreakLink_m.h"
 
 Define_Module(Ieee80211Mac);
 
@@ -68,6 +69,13 @@ Ieee80211Mac::~Ieee80211Mac()
 
     if (pendingRadioConfigMsg)
         delete pendingRadioConfigMsg;
+
+    while (!transmissionQueue.empty())
+    {
+    	Ieee80211Frame *temp = transmissionQueue.front();
+    	transmissionQueue.pop_front();
+    	delete temp;
+    }
 }
 
 /****************************************************************
@@ -148,6 +156,8 @@ void Ieee80211Mac::initialize(int stage)
         numReceived = 0;
         numSentBroadcast = 0;
         numReceivedBroadcast = 0;
+		numReceivedOther = 0;
+		numAckSend = 0;
         stateVector.setName("State");
         stateVector.setEnum("Ieee80211Mac");
         radioStateVector.setName("RadioState");
@@ -236,6 +246,7 @@ void Ieee80211Mac::handleSelfMsg(cMessage *msg)
 
 void Ieee80211Mac::handleUpperMsg(cPacket *msg)
 {
+
     // check for queue overflow
     if (maxQueueSize && (int)transmissionQueue.size() == maxQueueSize)
     {
@@ -302,6 +313,10 @@ void Ieee80211Mac::handleLowerMsg(cPacket *msg)
 {
     EV << "received message from lower layer: " << msg << endl;
 
+	nb->fireChangeNotification(NF_LINK_FULL_PROMISCUOUS, msg);
+    if (msg->getControlInfo())
+         delete msg->removeControlInfo();
+
     Ieee80211Frame *frame = dynamic_cast<Ieee80211Frame *>(msg);
     if (!frame)
         error("message from physical layer (%s)%s is not a subclass of Ieee80211Frame",
@@ -313,6 +328,12 @@ void Ieee80211Mac::handleLowerMsg(cPacket *msg)
 
     Ieee80211TwoAddressFrame *twoAddressFrame = dynamic_cast<Ieee80211TwoAddressFrame *>(msg);
     ASSERT(!twoAddressFrame || twoAddressFrame->getTransmitterAddress() != address);
+
+#ifdef LWMPLS
+    int msgKind = msg->getKind();
+    if (msgKind != COLLISION && msgKind != BITERROR && twoAddressFrame!=NULL)
+           nb->fireChangeNotification(NF_LINK_REFRESH, twoAddressFrame);
+#endif
 
     handleWithFSM(msg);
 
@@ -390,11 +411,11 @@ void Ieee80211Mac::handleWithFSM(cMessage *msg)
         {
             FSMA_Enter(sendDownPendingRadioConfigMsg());
             FSMA_Event_Transition(Wait-DIFS,
-                                  isMediumStateChange(msg) && isMediumFree(),
+                                  (isMediumStateChange(msg) && isMediumFree()),
                                   WAITDIFS,
             ;);
             FSMA_No_Event_Transition(Immediate-Wait-DIFS,
-                                     isMediumFree() || !backoff,
+                                     (isMediumFree() || (!backoff)),
                                      WAITDIFS,
             ;);
             FSMA_Event_Transition(Receive,
@@ -564,7 +585,7 @@ void Ieee80211Mac::handleWithFSM(cMessage *msg)
                                      isLowerMsg(msg) && isBroadcast(frame) && isDataOrMgmtFrame(frame),
                                      IDLE,
                 sendUp(frame);
-                numReceivedBroadcast++;
+				numReceivedBroadcast++;
                 resetStateVariables();
             );
             FSMA_No_Event_Transition(Immediate-Receive-Data,
@@ -577,10 +598,19 @@ void Ieee80211Mac::handleWithFSM(cMessage *msg)
                                      isLowerMsg(msg) && isForUs(frame) && frameType == ST_RTS,
                                      WAITSIFS,
             );
+
+			FSMA_No_Event_Transition(Immediate-Promiscuous-Data,
+                                    isLowerMsg(msg) && !isForUs(frame) && isDataOrMgmtFrame(frame),
+                                    IDLE,
+				nb->fireChangeNotification(NF_LINK_PROMISCUOUS, frame);
+				resetStateVariables();
+				numReceivedOther++;
+            );
             FSMA_No_Event_Transition(Immediate-Receive-Other,
                                      isLowerMsg(msg),
                                      IDLE,
                 resetStateVariables();
+				numReceivedOther++;
             );
         }
     }
@@ -781,6 +811,7 @@ void Ieee80211Mac::sendACKFrameOnEndSIFS()
 void Ieee80211Mac::sendACKFrame(Ieee80211DataOrMgmtFrame *frameToACK)
 {
     EV << "sending ACK frame\n";
+    numAckSend++;
     sendDown(setBasicBitrate(buildACKFrame(frameToACK)));
 }
 
@@ -903,8 +934,19 @@ void Ieee80211Mac::finishCurrentTransmission()
 
 void Ieee80211Mac::giveUpCurrentTransmission()
 {
+    Ieee80211DataOrMgmtFrame *temp = (Ieee80211DataOrMgmtFrame*) transmissionQueue.front();
+    cMessage *pkt = temp->decapsulate();
+
+    ControlInfoBreakLink *add = new ControlInfoBreakLink;
+    add->setDest(temp->getTransmitterAddress());
+    pkt->setControlInfo(add);
+
     popTransmissionQueue();
     resetStateVariables();
+
+    nb->fireChangeNotification(NF_LINK_BREAK, pkt);
+    if (pkt!=NULL)
+       delete pkt;
     numGivenUp++;
 }
 
@@ -971,6 +1013,10 @@ bool Ieee80211Mac::isBroadcast(Ieee80211Frame *frame)
 
 bool Ieee80211Mac::isForUs(Ieee80211Frame *frame)
 {
+//	int msgKind = frame->getKind();
+//    bool lastReceiveFailed =(msgKind == COLLISION || msgKind == BITERROR);
+//    if (frame && frame->getReceiverAddress() != address && !lastReceiveFailed)
+// 		nb->fireChangeNotification(NF_LINK_PROMISCUOUS, frame);
     return frame && frame->getReceiverAddress() == address;
 }
 
@@ -1029,3 +1075,18 @@ const char *Ieee80211Mac::modeName(int mode)
     return s;
 #undef CASE
 }
+
+void Ieee80211Mac::finish()
+{
+	recordScalar("numSent", numSent);
+	recordScalar("numSentWithoutRetry",numSentWithoutRetry);
+	recordScalar("numReceived", numReceived);
+	recordScalar("numSentBroadcast", numSentBroadcast);
+	recordScalar("numReceivedBroadcast", numReceivedBroadcast);
+	recordScalar("numReceivedOther", numReceivedOther);
+	recordScalar("numCollision", numCollision);
+	recordScalar("numGivenUp",numGivenUp);
+	recordScalar("numAckSend", numAckSend);
+	recordScalar("numRetry",numRetry);
+}
+

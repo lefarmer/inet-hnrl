@@ -59,11 +59,11 @@ module NetworkLayer
                 timeToLive = 32;
                 multicastTimeToLive = 32;
                 fragmentTimeout = 60s;
-                protocolMapping = "6:0,17:1,1:2,2:3,46:4,89:5,132:6";   //I.R.
+                protocolMapping = "6:0,17:1,1:2,2:3,46:4,89:5,132:6,254:7,135:7";
                 @display("p=85,95;q=queue");
             gates:
-                transportIn[7]; //I.R.
-                transportOut[7];
+                transportIn[8];
+                transportOut[8];
                 queueIn[sizeof(ifIn)];
         }
         arp: ARP {

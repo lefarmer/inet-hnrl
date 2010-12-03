@@ -64,6 +64,7 @@ class INET_API ARP : public cSimpleModule
     int retryCount;
     simtime_t cacheTimeout;
     bool doProxyARP;
+    bool globalARP;
 
     long numResolutions;
     long numFailedResolutions;
@@ -71,6 +72,7 @@ class INET_API ARP : public cSimpleModule
     long numRepliesSent;
 
     ARPCache arpCache;
+    static ARPCache globalArpCache;
 
     cQueue pendingQueue; // outbound packets waiting for ARP resolution
     int nicOutBaseGateId;  // id of the nicOut[0] gate
@@ -81,9 +83,11 @@ class INET_API ARP : public cSimpleModule
   public:
     ARP() {}
     virtual ~ARP();
+    int numInitStages() const {return 5;}
 
   protected:
-    virtual void initialize();
+
+    virtual void initialize(int);
     virtual void handleMessage(cMessage *msg);
     virtual void finish();
 

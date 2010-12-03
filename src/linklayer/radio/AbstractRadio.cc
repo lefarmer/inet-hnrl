@@ -21,6 +21,8 @@
 #include "FWMath.h"
 #include "PhyControlInfo_m.h"
 #include "Ieee80211Consts.h"  //XXX for the COLLISION and BITERROR msg kind constants
+#include "Radio80211aControlInfo_m.h"
+
 
 
 #define MK_TRANSMISSION_OVER  1
@@ -68,6 +70,11 @@ void AbstractRadio::initialize(int stage)
 
         // no channel switch pending
         newChannel = -1;
+
+        // statistics
+        numGivenUp = 0;
+        numReceivedCorrectly = 0;
+        lostVector.setName("MAC loss rate");
 
         // Initialize radio state. If thermal noise is already to high, radio
         // state has to be initialized as RECV
@@ -189,6 +196,7 @@ AirFrame *AbstractRadio::encapsulatePacket(cPacket *frame)
     ASSERT(!ctrl || ctrl->getChannelNumber()==-1); // per-packet channel switching not supported
 
     // Note: we don't set length() of the AirFrame, because duration will be used everywhere instead
+    if (ctrl && ctrl->getAdativeSensitivity()) updateSensitivity(ctrl->getBitrate());
     AirFrame *airframe = createAirFrame();
     airframe->setName(frame->getName());
     airframe->setPSend(transmitterPower);
@@ -207,6 +215,12 @@ AirFrame *AbstractRadio::encapsulatePacket(cPacket *frame)
 void AbstractRadio::sendUp(AirFrame *airframe)
 {
     cPacket *frame = airframe->decapsulate();
+    Radio80211aControlInfo * cinfo = new Radio80211aControlInfo;
+    cinfo->setSnr(airframe->getSnr());
+    cinfo->setLossRate(airframe->getLossRate());
+    cinfo->setRecPow(airframe->getPowRec());
+    frame->setControlInfo(cinfo);
+
     delete airframe;
     EV << "sending up frame " << frame->getName() << endl;
     send(frame, uppergateOut);
@@ -320,6 +334,7 @@ void AbstractRadio::handleCommand(int msgkind, cPolymorphic *ctrl)
 
 void AbstractRadio::handleSelfMsg(cMessage *msg)
 {
+    EV<<"AbstractRadio::handleSelfMsg"<<msg->getKind()<<endl;
     if (msg->getKind()==MK_RECEPTION_COMPLETE)
     {
         EV << "frame is completely received now\n";
@@ -362,6 +377,7 @@ void AbstractRadio::handleSelfMsg(cMessage *msg)
     {
         error("Internal error: unknown self-message `%s'", msg->getName());
     }
+    EV<<"AbstractRadio::handleSelfMsg END"<<endl;
 }
 
 
@@ -399,7 +415,7 @@ void AbstractRadio::handleLowerMsgStart(AirFrame * airframe)
 
     // calculate receive power
     double rcvdPower = receptionModel->calculateReceivedPower(airframe->getPSend(), carrierFrequency, distance);
-
+    airframe->setPowRec(rcvdPower);
     // store the receive power in the recvBuff
     recvBuff[airframe] = rcvdPower;
 
@@ -479,6 +495,8 @@ void AbstractRadio::handleLowerMsgEnd(AirFrame * airframe)
         snrInfo.ptr = NULL;
         snrInfo.sList.clear();
 
+        airframe->setSnr(10*log10(recvBuff[airframe]/ noiseLevel));//ahmed
+        airframe->setLossRate(lossRate);
         // delete the frame from the recvBuff
         recvBuff.erase(airframe);
 
@@ -491,6 +509,18 @@ void AbstractRadio::handleLowerMsgEnd(AirFrame * airframe)
         {
             airframe->getEncapsulatedMsg()->setKind(list.size()>1 ? COLLISION : BITERROR);
             airframe->setName(list.size()>1 ? "COLLISION" : "BITERROR");
+
+            numGivenUp++;
+        }
+        else
+            numReceivedCorrectly++;
+
+        if ( (numReceivedCorrectly+numGivenUp)%50 == 0)
+        {
+            lossRate = (double)numGivenUp/((double)numReceivedCorrectly+(double)numGivenUp);
+            lostVector.record(lossRate);
+            numReceivedCorrectly = 0;
+            numGivenUp = 0;
         }
         sendUp(airframe);
     }
@@ -637,4 +667,44 @@ void AbstractRadio::setRadioState(RadioState::State newState)
     rs.setState(newState);
     nb->fireChangeNotification(NF_RADIOSTATE_CHANGED, &rs);
 }
+
+void AbstractRadio::updateSensitivity(double rate)
+{
+    EV<<"bitrate = "<<rate<<endl;
+    EV <<" sensitivity: "<<sensitivity<<endl;
+    if (rate == 6E+6)
+    {
+        sensitivity = FWMath::dBm2mW (-82);
+    }
+    else if (rate == 9E+6)
+    {
+        sensitivity = FWMath::dBm2mW (-81);
+    }
+    else if (rate == 12E+6)
+    {
+        sensitivity = FWMath::dBm2mW (-79);
+    }
+    else if (rate == 18E+6)
+    {
+        sensitivity = FWMath::dBm2mW (-77);
+    }
+    else if (rate == 24E+6)
+    {
+        sensitivity = FWMath::dBm2mW (-74);
+    }
+    else if (rate == 36E+6)
+    {
+        sensitivity = FWMath::dBm2mW (-70);
+    }
+    else if (rate == 48E+6)
+    {
+        sensitivity = FWMath::dBm2mW (-66);
+    }
+    else if (rate == 54E+6)
+    {
+        sensitivity = FWMath::dBm2mW (-65);
+    }
+    EV <<" sensitivity after updateSensitivity: "<<sensitivity<<endl;
+}
+
 

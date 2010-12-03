@@ -27,6 +27,7 @@
 #include "IPDatagram.h"
 #include "IPFragBuf.h"
 #include "ProtocolMap.h"
+#include "ControlManetRouting_m.h"
 
 
 class ARPPacket;
@@ -46,6 +47,7 @@ class INET_API IP : public QueueBase
     IInterfaceTable *ift;
     ICMPAccess icmpAccess;
     cGate *queueOutGate; // the most frequently used output gate
+    bool manetRouting;
 
     // config
     int defaultTimeToLive;
@@ -118,7 +120,7 @@ class INET_API IP : public QueueBase
      * to handleMulticastPacket() for multicast packets, or drops the packet if
      * it's unroutable or forwarding is off.
      */
-    virtual void routePacket(IPDatagram *datagram, InterfaceEntry *destIE, bool fromHL);
+    virtual void routePacket(IPDatagram *datagram, InterfaceEntry *destIE, bool fromHL,IPAddress* nextHopAddrPtr);
 
     /**
      * Forwards packets to all multicast destinations, using fragmentAndSend().
@@ -146,6 +148,9 @@ class INET_API IP : public QueueBase
      * Last TTL check, then send datagram on the given interface.
      */
     virtual void sendDatagramToOutput(IPDatagram *datagram, InterfaceEntry *ie, IPAddress nextHopAddr);
+
+    virtual void controlMessageToManetRouting(int,IPDatagram *datagram);
+    virtual void dsrFillDestIE(IPDatagram *, InterfaceEntry *&destIE,IPAddress &nextHopAddress);
 
   public:
     IP() {}
