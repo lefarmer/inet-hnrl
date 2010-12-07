@@ -277,7 +277,7 @@ void WifiRobotRadio::initialize(int stage)
 
 void WifiRobotRadio::sendUp(AirFrameExtended *airframe)
 {
-	//	send a copy of the air frame (including IEEE 802.11 frame)
+	// send a copy of the air frame (including IEEE 802.11 frame)
 	// to mobility module of Wifi Robot for localization
 	// (by Joseph Kim)
 	AirFrameExtended *copy = airframe->dup();
