@@ -22,7 +22,7 @@
 #include "PhyControlInfo_m.h"
 #include "Ieee80211Consts.h"  //XXX for the COLLISION and BITERROR msg kind constants
 #include "Radio80211aControlInfo_m.h"
-#include "BasicBattery.h"
+//#include "BasicBattery.h"
 
 Define_Module(WifiRobotRadio);
 
