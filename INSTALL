@@ -41,8 +41,6 @@ opp_makemake -f --deep --make-so -o inet -O out
 
 If you are using the IDE, it will do it for you. You don't have to do anything.
 
-<<<<<<< HEAD
-=======
 Note:
 -----
 - by default INET is creating a shared library (libinet.dll, libinet.so etc.)
@@ -55,4 +53,3 @@ Note:
 - If you add/remove files/directories later in the src directory, you MUST
   re-create your makefile. Run "make makefiles" again if you are building
   from the command line. (The IDE does it for you automatically)
->>>>>>> master
