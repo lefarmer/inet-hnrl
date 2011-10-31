@@ -1,12 +1,13 @@
 /***************************************************************************
  * file:        WifiRobotMobility.cc
  *
- * authors:     Ramya Sasidharan
- *              Sion O'Boyle
+ * authors:     Sion O'Boyle
+ *              Ramya Sasidharan
+ *              Kyeong Soo (Joseph) Kim
  *
  * copyright:   (C) 2004 Telecommunication Networks Group (TKN) at
  *              Technische Universitaet Berlin, Germany.
- *              (C) 2010 School of Engineering at Swansea University,
+ *              (C) 2010-2011 College of Engineering, Swansea University,
  *              Wales, UK.
  *
  *              This program is free software; you can redistribute it
@@ -87,11 +88,11 @@ void WifiRobotMobility::handleMessage(cMessage * msg) {
 	if (msg->isSelfMessage()) {
 		handleSelfMsg(msg);
 	} else {
-		if (dynamic_cast<AirFrameExtended *> (msg) != NULL) {
-			handleLowerMsg(check_and_cast<AirFrameExtended *> (msg));
+		if (dynamic_cast<AirFrame *> (msg) != NULL) {
+			handleLowerMsg(check_and_cast<AirFrame *> (msg));
 		} else {
 			error(
-					"WifiRobotMobility module can receive only AirFramesExtended from the PHY layer");
+					"WifiRobotMobility module can receive only AirFrame from the PHY layer");
 		}
 	}
 }
@@ -109,7 +110,7 @@ void WifiRobotMobility::handleSelfMsg(cMessage* msg) {
 /**
  * Handle an Ieee80211BeaconFrame from the PHY layer.
  */
-void WifiRobotMobility::handleLowerMsg(AirFrameExtended *airFrame) {
+void WifiRobotMobility::handleLowerMsg(AirFrame *airFrame) {
 
 	cMessage *msg = airFrame->decapsulate();
 

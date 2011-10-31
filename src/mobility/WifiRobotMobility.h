@@ -3,10 +3,11 @@
  *
  * authors:     Sion O'Boyle
  * 				Ramya Sasidharan
+ *              Kyeong Soo (Joseph) Kim
  *
  * copyright:   (C) 2004 Telecommunication Networks Group (TKN) at
  *              Technische Universitaet Berlin, Germany.
- *              (C) 2010 School of Engineering at Swansea University,
+ *              (C) 2010-2011 College of Engineering, Swansea University,
  *              Wales, UK.
  *
  *              This program is free software; you can redistribute it
@@ -27,7 +28,8 @@
 #include <omnetpp.h>
 
 #include "BasicMobility.h"
-#include "AbstractRadioExtended.h"
+//#include "AbstractRadioExtended.h"
+#include "Ieee80211Radio.h"
 #include "Ieee80211Frame_m.h"
 #include "Ieee80211MgmtFrames_m.h"
 //#include "Radio80211aControlInfo_m.h"
@@ -118,8 +120,8 @@ class INET_API WifiRobotMobility : public BasicMobility
     /** @brief Called upon arrival of a self messages*/
     virtual void handleSelfMsg(cMessage *msg);
 
-    /** @brief Called upon arrival of an AirFrameExtended from PHY layer */
-    virtual void handleLowerMsg(AirFrameExtended *airFrame);
+    /** @brief Called upon arrival of an AirFrame from PHY layer */
+    virtual void handleLowerMsg(AirFrame *airFrame);
 
     /** @brief Calculate the target position to move to*/
     virtual void setTargetPosition();
