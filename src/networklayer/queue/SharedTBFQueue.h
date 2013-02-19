@@ -62,6 +62,7 @@ class SharedTBFQueue : public PassiveQueueBase
 	QueueVector queues;
 	TimeVector lastTime; // vector of the last time the TBF used
 	BoolVector conformityFlag;  // vector of flag to indicate whether the HOL frame conforms to TBF
+	int currentEarliestQueue;
 	
 	// components of each queue
 	LongLongVector meanBucketLength;  // vector of the number of tokens (bits) in the bucket for mean rate/burst control
@@ -72,6 +73,7 @@ class SharedTBFQueue : public PassiveQueueBase
 	DoubleVector modRate;
 	DoubleVector contribution;
 	LongLongVector bucketSize;    // in bit; note that the corresponding parameter in NED/INI is in byte.
+	TimeVector threshTime;
 	
 	// controller components
 	double sharedRate;
@@ -146,9 +148,15 @@ class SharedTBFQueue : public PassiveQueueBase
 	 * New for SharedTBFQueue.
 	 */
 	 
-	 virtual void update();
+	 virtual void updateAll(); // update the whole system
+	 
+	 virtual void updateState(int queueIndex); // update the burst length of one queue
+	 
+	 virtual void updateOneQueue(int queueIndex); // like updateState, but is called after a packet is sent i.e. the threshold time has changed
 	 
 	 virtual void prioritySchedule(cMessage *msg, int priority);
+	 
+	 virtual simtime_t getThreshTime(int queueIndex);
 };
 
 #endif

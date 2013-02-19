@@ -18,6 +18,7 @@
 
 
 #include "SharedTBFQueue.h"
+#include <simtime.h>
 
 Define_Module(SharedTBFQueue);
 
@@ -46,12 +47,13 @@ void SharedTBFQueue::initialize()
 	mtu = par("mtu").longValue()*8; // in bit
 	peakRate = par("peakRate"); // in bps
 	threshValue = 0.95;
-	earliestThreshTime = getMaxTime();
+	earliestThreshTime = SimTime::getMaxTime();
 
     // state
     const char *classifierClass = par("classifierClass");
     classifier = check_and_cast<IQoSClassifier *>(createOne(classifierClass));
     classifier->setMaxNumQueues(numQueues);
+	currentEarliestQueue = 0;
 
     outGate = gate("out");
 
@@ -60,8 +62,9 @@ void SharedTBFQueue::initialize()
     meanBucketLength.assign(numQueues, 0); // was bucketSize
     peakBucketLength.assign(numQueues, mtu);
     lastTime.assign(numQueues, simTime());
+	threshTime.assign(numQueues, simTime());
     conformityFlag.assign(numQueues, false);
-    conformityTimer.assign(numQueues, (cMessage *)NULL);
+    conformityTimer.assign(numQueues+1, (cMessage *)NULL);
 	isActive.assign(numQueues, true);
 	meanRate.assign(numQueues, 0.0);
 	modRate.assign(numQueues, 0.0);
@@ -102,6 +105,8 @@ void SharedTBFQueue::initialize()
 	{
 		contribution[i] = meanRate[i] / meanRateTotal;
 	}
+	
+	updateAll();
 }
 
 
@@ -127,7 +132,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
     {   // Conformity Timer expires
         int queueIndex = msg->getKind();    // message kind carries a queue index
 		
-		if (queueIndex >= 0) // conformity message
+		if (queueIndex >= 0 && queueIndex < numQueues) // conformity message
 		{
 			conformityFlag[queueIndex] = true;
 			if (packetRequested > 0)
@@ -141,6 +146,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
 						numQueueSent[currentQueueIndex]++;
 					}
 					sendOut(msg);
+					updateOneQueue(queueIndex);
 				}
 				else
 				{
@@ -161,7 +167,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
 					isActive[i] = true;
 				}
 			}
-			update();
+			updateAll();
 		}
     }
     else
@@ -193,6 +199,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
                     }
                     currentQueueIndex = queueIndex;
                     sendOut(msg);
+					updateOneQueue(queueIndex);
                 }
                 else
                 {
@@ -330,7 +337,26 @@ void SharedTBFQueue::requestPacket()
             numQueueSent[currentQueueIndex]++;
         }
         sendOut(msg);
+		updateOneQueue(currentQueueIndex);
     }
+}
+
+void SharedTBFQueue::updateState(int i) // i = queue index
+{
+	simtime_t now = simTime();
+	
+	unsigned long long meanTemp = meanBucketLength[i] + (unsigned long long)(((isActive[i] ? meanRate[i] : 0.0) + modRate[i])*(now - lastTime[i]).dbl() + 0.5);
+	meanBucketLength[i] = (unsigned long long)((meanTemp > bucketSize[i]) ? bucketSize[i] : meanTemp);
+	unsigned long long peakTemp = peakBucketLength[i] + (unsigned long long)(peakRate*(now - lastTime[i]).dbl() + 0.5);
+	peakBucketLength[i] = int((peakTemp > mtu) ? mtu : peakTemp);
+	
+	lastTime[i] = now;
+}
+
+simtime_t SharedTBFQueue::getThreshTime(int i) // i = queue index
+{
+	updateState(i);
+	return simTime() + 100 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
 }
 
 bool SharedTBFQueue::isConformed(int queueIndex, int pktLength)
@@ -342,14 +368,10 @@ bool SharedTBFQueue::isConformed(int queueIndex, int pktLength)
     EV << "Current Time = " << simTime() << endl;
     EV << "Packet Length = " << pktLength << endl;
 // DEBUG
-
-    // update states
-    simtime_t now = simTime();
-    unsigned long long meanTemp = meanBucketLength[queueIndex] + (unsigned long long)(meanRate[queueIndex]*(now - lastTime[queueIndex]).dbl() + 0.5);
-    meanBucketLength[queueIndex] = (long long)((meanTemp > bucketSize[queueIndex]) ? bucketSize[queueIndex] : meanTemp);
-    unsigned long long peakTemp = peakBucketLength[queueIndex] + (unsigned long long)(peakRate*(now - lastTime[queueIndex]).dbl() + 0.5);
-    peakBucketLength[queueIndex] = int((peakTemp > mtu) ? mtu : peakTemp);
-    lastTime[queueIndex] = now;
+	
+	// TODO: Clean up this mess
+    // update state for this one queue
+	updateState(queueIndex);
 
     if (pktLength <= meanBucketLength[queueIndex])
     {
@@ -363,13 +385,18 @@ bool SharedTBFQueue::isConformed(int queueIndex, int pktLength)
     return false;
 }
 
+void SharedTBFQueue::sendOut(cMessage *msg)
+{
+    send(msg, outGate);
+}
+
 // trigger TBF conformity timer for the HOL frame in the queue,
 // indicating that enough tokens will be available for its transmission
 void SharedTBFQueue::triggerConformityTimer(int queueIndex, int pktLength)
 {
     Enter_Method("triggerConformityCounter()");
 
-    double meanDelay = (pktLength - meanBucketLength[queueIndex]) / meanRate[queueIndex] + modRate[queueIndex];
+    double meanDelay = (pktLength - meanBucketLength[queueIndex]) / (isActive[queueIndex] ? meanRate[queueIndex] : 0.0) + modRate[queueIndex];
     double peakDelay = (pktLength - peakBucketLength[queueIndex]) / peakRate;
 
 // DEBUG
@@ -403,7 +430,7 @@ void SharedTBFQueue::finish()
     unsigned long sumQueueReceived = 0;
     unsigned long sumQueueDropped = 0;
     unsigned long sumQueueShaped = 0;
-    unsigned long sumQueueUnshaped = 0;
+//    unsigned long sumQueueUnshaped = 0;
 
     for (int i=0; i < numQueues; i++)
     {
@@ -430,24 +457,26 @@ void SharedTBFQueue::finish()
 //  C O N T R O L L E R
 // =====================
 
-void SharedTBFQueue::update()
+void SharedTBFQueue::updateAll()
 {
 	double tempSharedRateUsage = 0.0;
-	unsigned long long meanTemp;
-	unsigned long long peakTemp;
 	
 	// update own shared bucket first
 	
 	// TODO: Complete this, similar to isConformed()
 	
-//	simtime_t now = simTime();
-	simtime_t tempThreshTime = simTime();
-	
-	// TODO: Cancel ALL current timers
-	
 	sharedRate = 0.0;
 	
-	// gather rates from donating subscribers
+	// get latest state of all queues
+	for (int i=0; i<numQueues; i++)
+	{
+		updateState(i);
+	}
+	
+	// cancel threshold timer
+	cancelEvent(conformityTimer[numQueues]);
+	
+	// gather rates from donating subscribers and cancel all conformity timers
 	for (int i=0; i<numQueues; i++)
 	{
 		if (!isActive[i])
@@ -455,6 +484,7 @@ void SharedTBFQueue::update()
 			modRate[i] = 0.0;
 			sharedRate += meanRate[i];
 		}
+		cancelEvent(conformityTimer[i]);
 	}
 	
 	// then distribute rates among active subscribers
@@ -472,24 +502,56 @@ void SharedTBFQueue::update()
 	// disribute the remaining sharedRate to active subscribers based on the sharedRate algorithm
 	//---
 	
-	// if the algorithm cannot apply right now, leave sharedRate to be given to sharedBucket at next update()
+	// if the algorithm cannot apply right now, leave sharedRate to be given to sharedBucket at next updateAll()
 	//---
 	
-	earliestThreshTime = getMaxTime();
+	earliestThreshTime = SimTime::getMaxTime();
 	
-	// find new timers for all queues
+	// find new event times for all queues
+	// send one threshold msg (earliest) and all conformity msgs
 	for (int i=0; i<numQueues; i++)
 	{
 		if (isActive[i])
 		{
-			// FIXME this is wrong
-			tempThreshTime = ((bucketSize[i] * threshValue) - meanBucketLength[i]) / (meanRate[i] + modRate[i])
-			if (tempThreshTime < earliestThreshTime)
-				earliestThreshTime = tempThreshTime;
+			threshTime[i] = getThreshTime(i);
+			if (threshTime[i] < earliestThreshTime)
+			{
+				earliestThreshTime = threshTime[i];
+				currentEarliestQueue = i;
+			}
 		}
 		triggerConformityTimer(i, (check_and_cast<cPacket *>(queues[i]->front()))->getBitLength());
 	}
-	sheduleAt(earliestThreshTime+100, conformityTimer[-1]);
+	scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
+}
+
+// called when a packet is sent out
+// does the relevant queue still have the earliest thresh time?
+void SharedTBFQueue::updateOneQueue(int queueIndex)
+{
+	if (!isActive[queueIndex] && meanBucketLength[queueIndex] < (bucketSize[queueIndex] * threshValue))
+	{
+		isActive[queueIndex] = true;
+		updateAll();
+	}
+	else
+	{
+		threshTime[queueIndex] = getThreshTime(queueIndex);
+		if (queueIndex == currentEarliestQueue)
+		{
+			earliestThreshTime = SimTime::getMaxTime();
+			for (int i=0; i<numQueues; i++)
+			{
+				if (threshTime[i] < earliestThreshTime)
+				{
+					earliestThreshTime = threshTime[i];
+					currentEarliestQueue = i;
+				}
+			}
+			cancelEvent(conformityTimer[numQueues]);
+			scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
+		}
+	}
 }
 
 
@@ -498,14 +560,9 @@ void SharedTBFQueue::update()
 //  S C H E D U L E R
 // ===================
 
-// TODO: schedule()
+// TODO
 
 void SharedTBFQueue::prioritySchedule(cMessage *msg, int priority) // msg or *msg?
 {
 	//---
-}
-
-void SharedTBFQueue::sendOut(cMessage *msg)
-{
-    send(msg, outGate);
 }
