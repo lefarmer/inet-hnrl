@@ -42,11 +42,13 @@ void SharedTBFQueue::initialize()
     PassiveQueueBase::initialize();
 
 	// configuration
+	useSharedBucket = par("useSharedBucket");
 	frameCapacity = par("frameCapacity");
 	numQueues = par("numQueues");
 	mtu = par("mtu").longValue()*8; // in bit
 	peakRate = par("peakRate"); // in bps
 	threshValue = 0.95;
+	donationValue = 0.95;
 	earliestThreshTime = SimTime::getMaxTime();
 
     // state
@@ -69,7 +71,7 @@ void SharedTBFQueue::initialize()
 	meanRate.assign(numQueues, 0.0);
 	modRate.assign(numQueues, 0.0);
 	
-    for (int i=0; i<numQueues; i++)
+    for (int i=0; i<=numQueues; i++)
     {
         char buf[32];
         sprintf(buf, "queue-%d", i);
@@ -158,6 +160,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
 		{
 			for (int i=0; i<numQueues; i++)
 			{
+				updateState(i);
 				if (meanBucketLength[i] > bucketSize[i] * threshValue)
 				{
 					isActive[i] = false;
@@ -369,7 +372,6 @@ bool SharedTBFQueue::isConformed(int queueIndex, int pktLength)
     EV << "Packet Length = " << pktLength << endl;
 // DEBUG
 	
-	// TODO: Clean up this mess
     // update state for this one queue
 	updateState(queueIndex);
 
@@ -481,8 +483,8 @@ void SharedTBFQueue::updateAll()
 	{
 		if (!isActive[i])
 		{
-			modRate[i] = 0.0;
-			sharedRate += meanRate[i];
+			modRate[i] = meanRate[i] * (1 - donationValue);
+			sharedRate += meanRate[i] * donationValue;
 		}
 		cancelEvent(conformityTimer[i]);
 	}
@@ -561,6 +563,7 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 // ===================
 
 // TODO
+// actually this might not be necessary
 
 void SharedTBFQueue::prioritySchedule(cMessage *msg, int priority) // msg or *msg?
 {

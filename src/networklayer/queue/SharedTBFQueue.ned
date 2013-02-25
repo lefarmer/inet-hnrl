@@ -27,6 +27,7 @@ package inet.networklayer.queue;
 simple SharedTBFQueue like OutputQueue
 {
     parameters:
+		bool useSharedBucket = default(false);
         int frameCapacity = default(100);  // per-subqueue capacity
         int numQueues = default(1);	// number of per-VLAN queues
 		string classifierClass = default("BasicVLANClassifier");  // class that inherits from IQoSClassifier

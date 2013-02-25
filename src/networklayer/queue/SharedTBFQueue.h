@@ -49,12 +49,14 @@ class SharedTBFQueue : public PassiveQueueBase
 
   protected:
 	// configuration
+	bool useSharedBucket;
 	int frameCapacity;
 	int numQueues;
 	double meanRateTotal;
 	int mtu;   // in bit; note that the corresponding parameter in NED/INI is in byte.
 	double peakRate;
 	double threshValue;
+	double donationValue;
 	simtime_t earliestThreshTime;
 
     // state
