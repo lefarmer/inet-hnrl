@@ -61,7 +61,7 @@ void SharedTBFQueue::initialize()
 
     // set subqueues
     queues.assign(numQueues, (cQueue *)NULL);
-    meanBucketLength.assign(numQueues, 0); // was bucketSize
+    meanBucketLength.assign(numQueues, 0.0); // was bucketSize
     peakBucketLength.assign(numQueues, mtu);
     lastTime.assign(numQueues, simTime());
 	threshTime.assign(numQueues, simTime());
@@ -70,14 +70,18 @@ void SharedTBFQueue::initialize()
 	isActive.assign(numQueues, true);
 	meanRate.assign(numQueues, 0.0);
 	modRate.assign(numQueues, 0.0);
+	bucketSize.assign(numQueues, 0.0);
+	contribution.assign(numQueues, 0.0);
+	threshTime.assign(numQueues, simTime());
 	
-    for (int i=0; i<=numQueues; i++)
+    for (int i=0; i<numQueues; i++)
     {
         char buf[32];
         sprintf(buf, "queue-%d", i);
         queues[i] = new cQueue(buf);
         conformityTimer[i] = new cMessage("Conformity Timer", i);   // message kind carries a queue index
     }
+	conformityTimer[numQueues] = new cMessage("Threshold Timer", numQueues);
 
     // state: RR scheduler
     currentQueueIndex = 0;
@@ -92,13 +96,15 @@ void SharedTBFQueue::initialize()
 	
 	meanRateTotal = 0.0;
 	
+	std::stringstream meanRateParam;
+	
 	// TODO: This par() usage might not work at all, test it ASAP
 	for (int i=0; i<numQueues; i++)
 	{
-		meanRate[i] = par("meanRate" + i); // in bps
+		meanRateParam << "meanRate" << i;
+		meanRate[i] = par((meanRateParam.str()).c_str()); // in bps
 	//	bucketSize = par("bucketSize").longValue()*8LL; // TODO: Add an algorithm to determine bucketSize from meanRate
 		bucketSize[i] = par("bucketSize").longValue()*8LL; // in bit
-		modRate[i] = 0.0;
 		meanRateTotal += meanRate[i];
 	}
 	
@@ -522,6 +528,7 @@ void SharedTBFQueue::updateAll()
 				currentEarliestQueue = i;
 			}
 		}
+		// TODO: Check whether the queue is empty
 		triggerConformityTimer(i, (check_and_cast<cPacket *>(queues[i]->front()))->getBitLength());
 	}
 	scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
