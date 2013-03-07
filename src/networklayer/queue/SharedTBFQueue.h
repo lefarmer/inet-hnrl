@@ -58,6 +58,7 @@ class SharedTBFQueue : public PassiveQueueBase
 	double threshValue;
 	double donationValue;
 	simtime_t earliestThreshTime;
+	simtime_t secondEarliestThreshTime;
 
     // state
 	IQoSClassifier *classifier;

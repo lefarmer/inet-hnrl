@@ -50,6 +50,7 @@ void SharedTBFQueue::initialize()
 	threshValue = 0.95;
 	donationValue = 0.95;
 	earliestThreshTime = SimTime::getMaxTime();
+	secondEarliestThreshTime = SimTime::getMaxTime();
 
     // state
     const char *classifierClass = par("classifierClass");
@@ -165,18 +166,6 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
 		}
 		else // queue threshold message
 		{
-			for (int i=0; i<numQueues; i++)
-			{
-				updateState(i);
-				if (meanBucketLength[i] > bucketSize[i] * threshValue)
-				{
-					isActive[i] = false;
-				}
-				else
-				{
-					isActive[i] = true;
-				}
-			}
 			updateAll();
 		}
     }
@@ -405,8 +394,6 @@ void SharedTBFQueue::triggerConformityTimer(int queueIndex, int pktLength)
 {
     Enter_Method("triggerConformityCounter()");
 	
-	updateState(queueIndex);
-	
     double meanDelay = (pktLength - meanBucketLength[queueIndex]) / (isActive[queueIndex] ? meanRate[queueIndex] : 0.0) + modRate[queueIndex];
     double peakDelay = (pktLength - peakBucketLength[queueIndex]) / peakRate;
 
@@ -490,6 +477,14 @@ void SharedTBFQueue::updateAll()
 	// gather rates from donating subscribers and cancel all conformity timers
 	for (int i=0; i<numQueues; i++)
 	{
+		if (meanBucketLength[i] > bucketSize[i] * threshValue)
+		{
+			isActive[i] = false;
+		}
+		else
+		{
+			isActive[i] = true;
+		}		
 		if (!isActive[i])
 		{
 			modRate[i] = meanRate[i] * (1 - donationValue);
@@ -516,7 +511,8 @@ void SharedTBFQueue::updateAll()
 	// if the algorithm cannot apply right now, leave sharedRate to be given to sharedBucket at next updateAll()
 	//---
 	
-	earliestThreshTime = SimTime::getMaxTime();
+	earliestThreshTime = getThreshTime(0);
+	secondEarliestThreshTime = SimTime::getMaxTime();
 	
 	// find new event times for all queues
 	// send one threshold msg (earliest) and all conformity msgs
@@ -525,10 +521,19 @@ void SharedTBFQueue::updateAll()
 		if (isActive[i])
 		{
 			threshTime[i] = getThreshTime(i);
-			if (threshTime[i] < earliestThreshTime)
+			if (threshTime[i] == earliestThreshTime)
 			{
+				secondEarliestThreshTime = earliestThreshTime;
+			}
+			else if (threshTime[i] < earliestThreshTime)
+			{
+				secondEarliestThreshTime = earliestThreshTime;
 				earliestThreshTime = threshTime[i];
 				currentEarliestQueue = i;
+			}
+			if (threshTime[i] > earliestThreshTime && threshTime[i] < secondEarliestThreshTime)
+			{
+				secondEarliestThreshTime = threshTime[i];
 			}
 		}
 		if (!queues[i]->isEmpty())
@@ -545,7 +550,6 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 {
 	if (!isActive[queueIndex] && meanBucketLength[queueIndex] < (bucketSize[queueIndex] * threshValue))
 	{
-		isActive[queueIndex] = true;
 		updateAll();
 	}
 	else
@@ -553,23 +557,35 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 		threshTime[queueIndex] = getThreshTime(queueIndex);
 		if (queueIndex == currentEarliestQueue)
 		{
-			earliestThreshTime = SimTime::getMaxTime();
-			for (int i=0; i<numQueues; i++)
+			if (threshTime[queueIndex] > secondEarliestThreshTime) // for efficiency - don't need to recalculate everything if it's still the earliest
 			{
-				if (isActive[i] && threshTime[i] < earliestThreshTime)
+				earliestThreshTime = threshTime[0];
+				secondEarliestThreshTime = SimTime::getMaxTime();
+				for (int i=0; i<numQueues; i++)
 				{
-					earliestThreshTime = threshTime[i];
-					currentEarliestQueue = i;
+					if (isActive[i])
+					{
+						threshTime[i] = getThreshTime(i);
+						if (threshTime[i] == earliestThreshTime)
+						{
+							secondEarliestThreshTime = earliestThreshTime;
+						}
+						else if (threshTime[i] < earliestThreshTime)
+						{
+							secondEarliestThreshTime = earliestThreshTime;
+							earliestThreshTime = threshTime[i];
+							currentEarliestQueue = i;
+						}
+						if (threshTime[i] > earliestThreshTime && threshTime[i] < secondEarliestThreshTime)
+						{
+							secondEarliestThreshTime = threshTime[i];
+						}
+					}
 				}
 			}
 			cancelEvent(conformityTimer[numQueues]);
 			scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
 		}
-	//	cancelEvent(conformitytimer[queueIndex];
-	//	if (!queues[i]->isEmpty())
-	//	{
-	//		triggerConformityTimer(i, (check_and_cast<cPacket *>(queues[i]->front()))->getBitLength());
-	//	}
 	}
 }
 
