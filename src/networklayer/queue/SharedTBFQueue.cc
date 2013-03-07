@@ -96,11 +96,12 @@ void SharedTBFQueue::initialize()
 	
 	meanRateTotal = 0.0;
 	
-	std::stringstream meanRateParam;
+//	std::stringstream meanRateParam;
 	
 	// TODO: This par() usage might not work at all, test it ASAP
 	for (int i=0; i<numQueues; i++)
 	{
+		std::stringstream meanRateParam;
 		meanRateParam << "meanRate" << i;
 		meanRate[i] = par((meanRateParam.str()).c_str()); // in bps
 	//	bucketSize = par("bucketSize").longValue()*8LL; // TODO: Add an algorithm to determine bucketSize from meanRate
@@ -239,7 +240,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
                 }
                 else
                 {
-                    triggerConformityTimer(queueIndex, pktLength);
+                    triggerConformityTimer(queueIndex, pktLength); // TODO: this sometimes causes a multiple message error
                     conformityFlag[queueIndex] = false;
                 }
             }
@@ -364,8 +365,8 @@ void SharedTBFQueue::updateState(int i) // i = queue index
 
 simtime_t SharedTBFQueue::getThreshTime(int i) // i = queue index
 {
-	updateState(i);
-	return simTime() + 100 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
+	updateState(i);                                              // data remaining / rate
+	return simTime() + 0.1 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
 }
 
 bool SharedTBFQueue::isConformed(int queueIndex, int pktLength)
@@ -403,7 +404,9 @@ void SharedTBFQueue::sendOut(cMessage *msg)
 void SharedTBFQueue::triggerConformityTimer(int queueIndex, int pktLength)
 {
     Enter_Method("triggerConformityCounter()");
-
+	
+	updateState(queueIndex);
+	
     double meanDelay = (pktLength - meanBucketLength[queueIndex]) / (isActive[queueIndex] ? meanRate[queueIndex] : 0.0) + modRate[queueIndex];
     double peakDelay = (pktLength - peakBucketLength[queueIndex]) / peakRate;
 
@@ -528,8 +531,10 @@ void SharedTBFQueue::updateAll()
 				currentEarliestQueue = i;
 			}
 		}
-		// TODO: Check whether the queue is empty
-		triggerConformityTimer(i, (check_and_cast<cPacket *>(queues[i]->front()))->getBitLength());
+		if (!queues[i]->isEmpty())
+		{
+			triggerConformityTimer(i, (check_and_cast<cPacket *>(queues[i]->front()))->getBitLength());
+		}
 	}
 	scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
 }
@@ -551,7 +556,7 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 			earliestThreshTime = SimTime::getMaxTime();
 			for (int i=0; i<numQueues; i++)
 			{
-				if (threshTime[i] < earliestThreshTime)
+				if (isActive[i] && threshTime[i] < earliestThreshTime)
 				{
 					earliestThreshTime = threshTime[i];
 					currentEarliestQueue = i;
@@ -560,6 +565,11 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 			cancelEvent(conformityTimer[numQueues]);
 			scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
 		}
+	//	cancelEvent(conformitytimer[queueIndex];
+	//	if (!queues[i]->isEmpty())
+	//	{
+	//		triggerConformityTimer(i, (check_and_cast<cPacket *>(queues[i]->front()))->getBitLength());
+	//	}
 	}
 }
 
