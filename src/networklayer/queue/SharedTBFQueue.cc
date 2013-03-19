@@ -547,7 +547,7 @@ void SharedTBFQueue::updateAll()
 				secondEarliestThreshTime = threshTime[i];
 			}
 		}
-		if (!queues[i]->isEmpty())
+		if (!queues[i]->isEmpty() && !conformityFlag[i])
 		{
 			triggerConformityTimer(i, (check_and_cast<cPacket *>(queues[i]->front()))->getBitLength());
 		}
