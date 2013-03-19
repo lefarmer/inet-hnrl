@@ -97,9 +97,6 @@ void SharedTBFQueue::initialize()
 	
 	meanRateTotal = 0.0;
 	
-//	std::stringstream meanRateParam;
-	
-	// TODO: This par() usage might not work at all, test it ASAP
 	for (int i=0; i<numQueues; i++)
 	{
 		std::stringstream meanRateParam;
@@ -144,7 +141,11 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
 		
 		if (queueIndex >= 0 && queueIndex < numQueues) // conformity message
 		{
+			// update TBF status
+			int pktLength = (check_and_cast<cPacket *>(queues[queueIndex]->front()))->getBitLength();
+			ASSERT(isConformed(queueIndex, pktLength)); 
 			conformityFlag[queueIndex] = true;
+			
 			if (packetRequested > 0)
 			{
 				cMessage *msg = dequeue();
@@ -394,6 +395,8 @@ void SharedTBFQueue::triggerConformityTimer(int queueIndex, int pktLength)
 {
     Enter_Method("triggerConformityCounter()");
 	
+	updateState(queueIndex);
+	
     double meanDelay = (pktLength - meanBucketLength[queueIndex]) / (isActive[queueIndex] ? meanRate[queueIndex] : 0.0) + modRate[queueIndex];
     double peakDelay = (pktLength - peakBucketLength[queueIndex]) / peakRate;
 
@@ -405,8 +408,16 @@ void SharedTBFQueue::triggerConformityTimer(int queueIndex, int pktLength)
     EV << "Current Time = " << simTime() << endl;
     EV << "Counter Expiration Time = " << simTime() + max(meanDelay, peakDelay) << endl;
 // DEBUG
-
-    scheduleAt(simTime() + max(meanDelay, peakDelay), conformityTimer[queueIndex]);
+	
+	bool isScheduled = conformityTimer[queueIndex]->isScheduled();
+	/*
+	if (conformityTimer[queueIndex]->isScheduled())
+	{
+		EV << "Trying to send conformity message already scheduled" << endl;
+		cancelEvent(conformityTimer[queueIndex]);
+	}*/
+	
+	scheduleAt(simTime() + max(meanDelay, peakDelay), conformityTimer[queueIndex]);
 }
 
 void SharedTBFQueue::dumpTbfStatus(int queueIndex)
