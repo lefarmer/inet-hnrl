@@ -345,9 +345,11 @@ void SharedTBFQueue::updateState(int i) // i = queue index
 {
 	simtime_t now = simTime();
 	
-	unsigned long long meanTemp = meanBucketLength[i] + (unsigned long long)(((isActive[i] ? meanRate[i] : 0.0) + modRate[i])*(now - lastTime[i]).dbl() + 0.5);
+//	unsigned long long meanTemp = meanBucketLength[i] + (unsigned long long)(((isActive[i] ? meanRate[i] : 0.0) + modRate[i])*(now - lastTime[i]).dbl() + 0.5);
+	unsigned long long meanTemp = meanBucketLength[i] + (unsigned long long)ceil(((isActive[i] ? meanRate[i] : 0.0) + modRate[i])*(now - lastTime[i]).dbl());
 	meanBucketLength[i] = (unsigned long long)((meanTemp > bucketSize[i]) ? bucketSize[i] : meanTemp);
-	unsigned long long peakTemp = peakBucketLength[i] + (unsigned long long)(peakRate*(now - lastTime[i]).dbl() + 0.5);
+//	unsigned long long peakTemp = peakBucketLength[i] + (unsigned long long)(peakRate*(now - lastTime[i]).dbl() + 0.5);
+	unsigned long long peakTemp = peakBucketLength[i] + (unsigned long long)ceil(peakRate*(now - lastTime[i]).dbl());
 	peakBucketLength[i] = int((peakTemp > mtu) ? mtu : peakTemp);
 	
 	lastTime[i] = now;
@@ -409,13 +411,13 @@ void SharedTBFQueue::triggerConformityTimer(int queueIndex, int pktLength)
     EV << "Counter Expiration Time = " << simTime() + max(meanDelay, peakDelay) << endl;
 // DEBUG
 	
-	bool isScheduled = conformityTimer[queueIndex]->isScheduled();
-	/*
+//	bool isScheduled = conformityTimer[queueIndex]->isScheduled();
+	
 	if (conformityTimer[queueIndex]->isScheduled())
 	{
 		EV << "Trying to send conformity message already scheduled" << endl;
 		cancelEvent(conformityTimer[queueIndex]);
-	}*/
+	}
 	
 	scheduleAt(simTime() + max(meanDelay, peakDelay), conformityTimer[queueIndex]);
 }
