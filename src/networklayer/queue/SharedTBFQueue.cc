@@ -35,6 +35,7 @@ SharedTBFQueue::~SharedTBFQueue()
         delete queues[i];
         cancelAndDelete(conformityTimer[i]);
     }
+	cancelAndDelete(conformityTimer[numQueues]);
 }
 
 void SharedTBFQueue::initialize()
