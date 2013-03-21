@@ -103,8 +103,8 @@ void SharedTBFQueue::initialize()
 		std::stringstream meanRateParam;
 		meanRateParam << "meanRate" << i;
 		meanRate[i] = par((meanRateParam.str()).c_str()); // in bps
-	//	bucketSize = par("bucketSize").longValue()*8LL; // TODO: Add an algorithm to determine bucketSize from meanRate
-		bucketSize[i] = par("bucketSize").longValue()*8LL; // in bit
+	//	bucketSize[i] = par("bucketSize").longValue()*8LL; // in bit
+		bucketSize[i] = max(mtu, meanRate[i] * 10 * 8); // in bit
 		meanRateTotal += meanRate[i];
 	}
 	
@@ -474,8 +474,10 @@ void SharedTBFQueue::updateAll()
 	double tempSharedRateUsage = 0.0;
 	
 	// update own shared bucket first
-	
-	// TODO: Complete this, similar to isConformed()
+	if (useSharedBucket)
+	{
+		// TODO: Complete this, similar to updateState()
+	}
 	
 	sharedRate = 0.0;
 	
@@ -545,7 +547,7 @@ void SharedTBFQueue::updateAll()
 				earliestThreshTime = threshTime[i];
 				currentEarliestQueue = i;
 			}
-			if (threshTime[i] > earliestThreshTime && threshTime[i] < secondEarliestThreshTime)
+			else if (threshTime[i] > earliestThreshTime && threshTime[i] < secondEarliestThreshTime)
 			{
 				secondEarliestThreshTime = threshTime[i];
 			}
@@ -590,7 +592,7 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 							earliestThreshTime = threshTime[i];
 							currentEarliestQueue = i;
 						}
-						if (threshTime[i] > earliestThreshTime && threshTime[i] < secondEarliestThreshTime)
+						else if (threshTime[i] > earliestThreshTime && threshTime[i] < secondEarliestThreshTime)
 						{
 							secondEarliestThreshTime = threshTime[i];
 						}
