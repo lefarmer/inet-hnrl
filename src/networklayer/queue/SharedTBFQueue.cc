@@ -158,7 +158,6 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
 						numQueueSent[currentQueueIndex]++;
 					}
 					sendOut(msg);
-					updateOneQueue(queueIndex);
 				}
 				else
 				{
@@ -200,7 +199,6 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
                     }
                     currentQueueIndex = queueIndex;
                     sendOut(msg);
-					updateOneQueue(queueIndex);
                 }
                 else
                 {
@@ -338,7 +336,6 @@ void SharedTBFQueue::requestPacket()
             numQueueSent[currentQueueIndex]++;
         }
         sendOut(msg);
-		updateOneQueue(currentQueueIndex);
     }
 }
 
@@ -359,6 +356,7 @@ void SharedTBFQueue::updateState(int i) // i = queue index
 simtime_t SharedTBFQueue::getThreshTime(int i) // i = queue index
 {
 	updateState(i);                                              // data remaining / rate
+	
 	return simTime() + 0.1 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
 }
 
@@ -381,6 +379,7 @@ bool SharedTBFQueue::isConformed(int queueIndex, int pktLength)
         {
             meanBucketLength[queueIndex] -= pktLength;
             peakBucketLength[queueIndex] -= pktLength;
+            updateOneQueue(queueIndex);
             return true;
         }
     }
@@ -560,7 +559,7 @@ void SharedTBFQueue::updateAll()
 	scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
 }
 
-// called when a packet is sent out
+// called when a packet is conformed and its meanBucketLength is reduced
 // does the relevant queue still have the earliest thresh time?
 void SharedTBFQueue::updateOneQueue(int queueIndex)
 {
