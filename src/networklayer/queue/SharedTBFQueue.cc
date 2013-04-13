@@ -357,7 +357,14 @@ simtime_t SharedTBFQueue::getThreshTime(int i) // i = queue index
 {
 	updateState(i);                                              // data remaining / rate
 	
-	return simTime() + 0.1 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
+	//debug - remove this
+	simtime_t time1 = simTime() + 0.1 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
+	simtime_t time2 = simTime() + 0.001 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
+	
+	EV << "Thresh time for queue " << i << " (old) = " << time1 << endl;
+	EV << "Thresh time for queue " << i << " (new) = " << time2 << endl;
+	
+	return simTime() + 0.001 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
 }
 
 bool SharedTBFQueue::isConformed(int queueIndex, int pktLength)
