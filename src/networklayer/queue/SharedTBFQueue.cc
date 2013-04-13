@@ -43,6 +43,7 @@ void SharedTBFQueue::initialize()
     PassiveQueueBase::initialize();
 
 	// configuration
+	useSharing = par("useSharing");
 	useSharedBucket = par("useSharedBucket");
 	frameCapacity = par("frameCapacity");
 	numQueues = par("numQueues");
@@ -496,32 +497,34 @@ void SharedTBFQueue::updateAll()
 	// cancel threshold timer
 	cancelEvent(conformityTimer[numQueues]);
 	
-	// gather rates from donating subscribers and cancel all conformity timers
-	for (int i=0; i<numQueues; i++)
-	{
-		if (meanBucketLength[i] > bucketSize[i] * threshValue)
+	if (useSharing){
+		// gather rates from donating subscribers and cancel all conformity timers
+		for (int i=0; i<numQueues; i++)
 		{
-			isActive[i] = false;
+			if (meanBucketLength[i] > bucketSize[i] * threshValue)
+			{
+				isActive[i] = false;
+			}
+			else
+			{
+				isActive[i] = true;
+			}		
+			if (!isActive[i])
+			{
+				modRate[i] = meanRate[i] * (1 - donationValue);
+				sharedRate += meanRate[i] * donationValue;
+			}
+			cancelEvent(conformityTimer[i]);
 		}
-		else
+		
+		// then distribute rates among active subscribers
+		for (int i=0; i<numQueues; i++)
 		{
-			isActive[i] = true;
-		}		
-		if (!isActive[i])
-		{
-			modRate[i] = meanRate[i] * (1 - donationValue);
-			sharedRate += meanRate[i] * donationValue;
-		}
-		cancelEvent(conformityTimer[i]);
-	}
-	
-	// then distribute rates among active subscribers
-	for (int i=0; i<numQueues; i++)
-	{
-		if (isActive[i])
-		{	
-			modRate[i] = sharedRate * contribution[i];
-			tempSharedRateUsage += modRate[i];
+			if (isActive[i])
+			{	
+				modRate[i] = sharedRate * contribution[i];
+				tempSharedRateUsage += modRate[i];
+			}
 		}
 	}
 	

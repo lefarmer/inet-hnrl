@@ -49,6 +49,7 @@ class SharedTBFQueue : public PassiveQueueBase
 
   protected:
 	// configuration
+	bool useSharing;
 	bool useSharedBucket;
 	int frameCapacity;
 	int numQueues;
