@@ -34,8 +34,8 @@ SharedTBFQueue::~SharedTBFQueue()
     {
         delete queues[i];
         cancelAndDelete(conformityTimer[i]);
+		cancelAndDelete(conformityTimer[i+numQueues]);
     }
-	cancelAndDelete(conformityTimer[numQueues]);
 }
 
 void SharedTBFQueue::initialize()
@@ -52,8 +52,8 @@ void SharedTBFQueue::initialize()
 	lengthPerBPS = par("lengthPerBPS"); // for bucket size
 	threshValue = 0.95;
 	donationValue = 0.95;
-	earliestThreshTime = SimTime::getMaxTime();
-	secondEarliestThreshTime = SimTime::getMaxTime();
+//	earliestThreshTime = SimTime::getMaxTime();
+//	secondEarliestThreshTime = SimTime::getMaxTime();
 
     // state
     const char *classifierClass = par("classifierClass");
@@ -70,7 +70,7 @@ void SharedTBFQueue::initialize()
     lastTime.assign(numQueues, simTime());
 	threshTime.assign(numQueues, simTime());
     conformityFlag.assign(numQueues, false);
-    conformityTimer.assign(numQueues+1, (cMessage *)NULL);
+    conformityTimer.assign(numQueues*2, (cMessage *)NULL);
 	isActive.assign(numQueues, true);
 	meanRate.assign(numQueues, 0.0);
 	modRate.assign(numQueues, 0.0);
@@ -84,8 +84,8 @@ void SharedTBFQueue::initialize()
         sprintf(buf, "queue-%d", i);
         queues[i] = new cQueue(buf);
         conformityTimer[i] = new cMessage("Conformity Timer", i);   // message kind carries a queue index
+		conformityTimer[i+numQueues] = new cMessage("Threshold Timer", i+numQueues);
     }
-	conformityTimer[numQueues] = new cMessage("Threshold Timer", numQueues);
 
     // state: RR scheduler
     currentQueueIndex = 0;
@@ -501,9 +501,6 @@ void SharedTBFQueue::updateAll()
 		updateState(i);
 	}
 	
-	// cancel threshold timer
-	cancelEvent(conformityTimer[numQueues]);
-	
 	if (useSharing){
 		// gather rates from donating subscribers and cancel all conformity timers
 		for (int i=0; i<numQueues; i++)
@@ -522,6 +519,7 @@ void SharedTBFQueue::updateAll()
 				sharedRate += meanRate[i] * donationValue;
 			}
 			cancelEvent(conformityTimer[i]);
+			cancelEvent(conformityTimer[i+numQueues]);
 		}
 		
 		// then distribute rates among active subscribers and send new conformity timers
@@ -531,6 +529,8 @@ void SharedTBFQueue::updateAll()
 			{	
 				modRate[i] = sharedRate * contribution[i];
 				tempSharedRateUsage += modRate[i];
+				threshTime[i] = getThreshTime(i);
+				scheduleAt(threshTime[i], conformityTimer[i+numQueues]);
 			}
 			if (!queues[i]->isEmpty() && !conformityFlag[i])
 			{
@@ -540,118 +540,22 @@ void SharedTBFQueue::updateAll()
 	}
 	
 	sharedRate -= tempSharedRateUsage;
-	
-	// disribute the remaining sharedRate to active subscribers based on the sharedRate algorithm
-	//---
-	
-	// if the algorithm cannot apply right now, leave sharedRate to be given to sharedBucket at next updateAll()
-	//---
-	// find a legitimate time to start with
-	bool foundActive = false;
-	int startPoint = 0;
-	for (int i=0; i<numQueues; i++)
-	{
-		if (isActive[i])
-		{
-			foundActive = true;
-			threshTime[i] = getThreshTime(i);
-			earliestThreshTime = threshTime[i];
-			currentEarliestQueue = i;
-			startPoint = i+1;
-			break;
-		}
-	}
-	secondEarliestThreshTime = SimTime::getMaxTime();
-	// find new event times for all queues
-	// send one threshold msg (earliest) and all conformity msgs
-	for (int i=startPoint; i<numQueues; i++)
-	{
-		if (isActive[i])
-		{
-			threshTime[i] = getThreshTime(i);
-			if (threshTime[i] == earliestThreshTime)
-			{
-				secondEarliestThreshTime = earliestThreshTime;
-			}
-			else if (threshTime[i] < earliestThreshTime)
-			{
-				secondEarliestThreshTime = earliestThreshTime;
-				earliestThreshTime = threshTime[i];
-				currentEarliestQueue = i;
-			}
-			else if (threshTime[i] > earliestThreshTime && threshTime[i] < secondEarliestThreshTime)
-			{
-				secondEarliestThreshTime = threshTime[i];
-			}
-		}
-	}
-	if (foundActive)
-	{
-		scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
-	}
 }
 
 // called when a packet is conformed and its meanBucketLength is reduced
-// does the relevant queue still have the earliest thresh time?
 void SharedTBFQueue::updateOneQueue(int queueIndex)
 {
-	bool foundActive = false;
-	if (!isActive[queueIndex] && meanBucketLength[queueIndex] < (bucketSize[queueIndex] * threshValue))
+	if (meanBucketLength[queueIndex] < (bucketSize[queueIndex] * threshValue))
 	{
-		updateAll();
-	}
-	else if (isActive[queueIndex])
-	{
-		threshTime[queueIndex] = getThreshTime(queueIndex);
-		if (queueIndex == currentEarliestQueue)
+		if (!isActive[queueIndex])
 		{
-			if (threshTime[queueIndex] > secondEarliestThreshTime) // for efficiency - don't need to recalculate everything if it's still the earliest
-			{
-				int startPoint = 0;
-				for (int i=0; i<numQueues; i++)
-				{
-					if (isActive[i])
-					{
-						foundActive = true;
-						threshTime[i] = getThreshTime(i);
-						earliestThreshTime = threshTime[i];
-						currentEarliestQueue = i;
-						startPoint = i+1;
-						break;
-					}
-				}
-				secondEarliestThreshTime = SimTime::getMaxTime();
-				for (int i=startPoint; i<numQueues; i++)
-				{
-					if (isActive[i])
-					{
-						threshTime[i] = getThreshTime(i);
-						if (threshTime[i] == earliestThreshTime)
-						{
-							secondEarliestThreshTime = earliestThreshTime;
-						}
-						else if (threshTime[i] < earliestThreshTime)
-						{
-							secondEarliestThreshTime = earliestThreshTime;
-							earliestThreshTime = threshTime[i];
-							currentEarliestQueue = i;
-						}
-						else if (threshTime[i] > earliestThreshTime && threshTime[i] < secondEarliestThreshTime)
-						{
-							secondEarliestThreshTime = threshTime[i];
-						}
-					}
-				}
-			}
-			cancelEvent(conformityTimer[numQueues]);
-			if (foundActive)
-			{
-				scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
-			}
-			else if (isActive[queueIndex])
-			{
-				scheduleAt(threshTime[queueIndex], conformityTimer[numQueues]);
-			}
+			updateAll();
+		}
+		else
+		{
+			threshTime[queueIndex] = getThreshTime(queueIndex);
+			cancelEvent(conformityTimer[queueIndex+numQueues]);
+			scheduleAt(threshTime[queueIndex], conformityTimer[queueIndex+numQueues]);
 		}
 	}
 }
