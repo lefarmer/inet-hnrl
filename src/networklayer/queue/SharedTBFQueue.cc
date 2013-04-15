@@ -648,6 +648,10 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 			{
 				scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
 			}
+			else if (isActive[queueIndex])
+			{
+				scheduleAt(threshTime[queueIndex], conformityTimer[numQueues]);
+			}
 		}
 	}
 }
