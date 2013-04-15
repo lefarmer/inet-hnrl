@@ -297,8 +297,8 @@ cMessage *SharedTBFQueue::dequeue()
 	
 	if (conformityTimer[currentQueueIndex]->isScheduled())
 	{
-		EV << "Error: pop while conformity timer is scheduled. Cancelling conformity timer." << endl;
-		cancelEvent(conformityTimer[currentQueueIndex]);
+		EV << "Error: pop while conformity timer is scheduled." << endl;
+	//	cancelEvent(conformityTimer[currentQueueIndex]);
 	}
     cMessage *msg = (cMessage *)queues[currentQueueIndex]->pop();
 
@@ -541,13 +541,24 @@ void SharedTBFQueue::updateAll()
 	
 	// if the algorithm cannot apply right now, leave sharedRate to be given to sharedBucket at next updateAll()
 	//---
-	
-	earliestThreshTime = getThreshTime(0);
+	// find a legitimate time to start with
+	int startPoint = 0;
+	for (int i=0; i<numQueues; i++)
+	{
+		if (isActive[i])
+		{
+			threshTime[i] = getThreshTime(i);
+			earliestThreshTime = threshTime[i];
+			currentEarliestQueue = i;
+			startPoint = i+1;
+			break;
+		}
+	}
 	secondEarliestThreshTime = SimTime::getMaxTime();
 	bool foundActive = false;
 	// find new event times for all queues
 	// send one threshold msg (earliest) and all conformity msgs
-	for (int i=0; i<numQueues; i++)
+	for (int i=startPoint; i<numQueues; i++)
 	{
 		if (isActive[i])
 		{
@@ -588,7 +599,7 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 	{
 		updateAll();
 	}
-	else
+	else if (isActive[queueIndex])
 	{
 		threshTime[queueIndex] = getThreshTime(queueIndex);
 		if (queueIndex == currentEarliestQueue)
