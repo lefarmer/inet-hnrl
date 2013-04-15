@@ -295,6 +295,8 @@ cMessage *SharedTBFQueue::dequeue()
         return NULL;
     }
 	
+	// In the simulation "cooperative_on_50m_bl8" this error occurs around the 10.3 second mark.
+	// This run of dequeue() is called by requestPacket().
 	if (conformityTimer[currentQueueIndex]->isScheduled())
 	{
 		EV << "Error: pop while conformity timer is scheduled." << endl;
