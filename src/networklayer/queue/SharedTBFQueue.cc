@@ -523,13 +523,17 @@ void SharedTBFQueue::updateAll()
 			cancelEvent(conformityTimer[i]);
 		}
 		
-		// then distribute rates among active subscribers
+		// then distribute rates among active subscribers and send new conformity timers
 		for (int i=0; i<numQueues; i++)
 		{
 			if (isActive[i])
 			{	
 				modRate[i] = sharedRate * contribution[i];
 				tempSharedRateUsage += modRate[i];
+			}
+			if (!queues[i]->isEmpty() && !conformityFlag[i])
+			{
+				triggerConformityTimer(i, (check_and_cast<cPacket *>(queues[i]->front()))->getBitLength());
 			}
 		}
 	}
@@ -578,10 +582,6 @@ void SharedTBFQueue::updateAll()
 			{
 				secondEarliestThreshTime = threshTime[i];
 			}
-		}
-		if (!queues[i]->isEmpty() && !conformityFlag[i])
-		{
-			triggerConformityTimer(i, (check_and_cast<cPacket *>(queues[i]->front()))->getBitLength());
 		}
 	}
 	if (foundActive)
