@@ -414,7 +414,7 @@ void SharedTBFQueue::triggerConformityTimer(int queueIndex, int pktLength)
 	
 	updateState(queueIndex);
 	
-    double meanDelay = (pktLength - meanBucketLength[queueIndex]) / (isActive[queueIndex] ? meanRate[queueIndex] : 0.0) + modRate[queueIndex];
+    double meanDelay = (pktLength - meanBucketLength[queueIndex]) / ((isActive[queueIndex] ? meanRate[queueIndex] : 0.0) + modRate[queueIndex]);
     double peakDelay = (pktLength - peakBucketLength[queueIndex]) / peakRate;
 
 // DEBUG
