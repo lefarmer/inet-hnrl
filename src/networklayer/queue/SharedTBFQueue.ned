@@ -31,6 +31,7 @@ simple SharedTBFQueue like OutputQueue
 		bool useSharedBucket = default(false);
         int frameCapacity = default(100);  // per-subqueue capacity
         int numQueues = default(1);	// number of per-VLAN queues
+		int lengthPerBPS = default(80);
 		string classifierClass = default("BasicVLANClassifier");  // class that inherits from IQoSClassifier
         //int bucketSize @unit(byte) = default(3000B);
 			// token bucket size; must be larger than mtu.

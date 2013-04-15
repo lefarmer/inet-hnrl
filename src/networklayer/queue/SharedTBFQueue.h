@@ -58,6 +58,7 @@ class SharedTBFQueue : public PassiveQueueBase
 	double peakRate;
 	double threshValue;
 	double donationValue;
+	int lengthPerBPS;
 	simtime_t earliestThreshTime;
 	simtime_t secondEarliestThreshTime;
 

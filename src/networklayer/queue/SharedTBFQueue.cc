@@ -49,6 +49,7 @@ void SharedTBFQueue::initialize()
 	numQueues = par("numQueues");
 	mtu = par("mtu").longValue()*8; // in bit
 	peakRate = par("peakRate"); // in bps
+	lengthPerBPS = par("lengthPerBPS"); // for bucket size
 	threshValue = 0.95;
 	donationValue = 0.95;
 	earliestThreshTime = SimTime::getMaxTime();
@@ -105,7 +106,7 @@ void SharedTBFQueue::initialize()
 		meanRateParam << "meanRate" << i;
 		meanRate[i] = par((meanRateParam.str()).c_str()); // in bps
 	//	bucketSize[i] = par("bucketSize").longValue()*8LL; // in bit
-		bucketSize[i] = max(mtu, meanRate[i] * 10 * 8); // in bit
+		bucketSize[i] = max(mtu, meanRate[i] * lengthPerBPS); // in bit
 		meanRateTotal += meanRate[i];
 	}
 	
@@ -293,7 +294,12 @@ cMessage *SharedTBFQueue::dequeue()
         // TO DO: further processing?
         return NULL;
     }
-
+	
+	if (conformityTimer[currentQueueIndex]->isScheduled())
+	{
+		EV << "Error: pop while conformity timer is scheduled. Cancelling conformity timer." << endl;
+		cancelEvent(conformityTimer[currentQueueIndex]);
+	}
     cMessage *msg = (cMessage *)queues[currentQueueIndex]->pop();
 
     // TO DO: update statistics
@@ -538,13 +544,14 @@ void SharedTBFQueue::updateAll()
 	
 	earliestThreshTime = getThreshTime(0);
 	secondEarliestThreshTime = SimTime::getMaxTime();
-	
+	bool foundActive = false;
 	// find new event times for all queues
 	// send one threshold msg (earliest) and all conformity msgs
 	for (int i=0; i<numQueues; i++)
 	{
 		if (isActive[i])
 		{
+			foundActive = true;
 			threshTime[i] = getThreshTime(i);
 			if (threshTime[i] == earliestThreshTime)
 			{
@@ -566,13 +573,17 @@ void SharedTBFQueue::updateAll()
 			triggerConformityTimer(i, (check_and_cast<cPacket *>(queues[i]->front()))->getBitLength());
 		}
 	}
-	scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
+	if (foundActive)
+	{
+		scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
+	}
 }
 
 // called when a packet is conformed and its meanBucketLength is reduced
 // does the relevant queue still have the earliest thresh time?
 void SharedTBFQueue::updateOneQueue(int queueIndex)
 {
+	bool foundActive = false;
 	if (!isActive[queueIndex] && meanBucketLength[queueIndex] < (bucketSize[queueIndex] * threshValue))
 	{
 		updateAll();
@@ -590,6 +601,7 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 				{
 					if (isActive[i])
 					{
+						foundActive = true;
 						threshTime[i] = getThreshTime(i);
 						if (threshTime[i] == earliestThreshTime)
 						{
@@ -609,7 +621,10 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 				}
 			}
 			cancelEvent(conformityTimer[numQueues]);
-			scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
+			if (foundActive)
+			{
+				scheduleAt(earliestThreshTime, conformityTimer[numQueues]);
+			}
 		}
 	}
 }
