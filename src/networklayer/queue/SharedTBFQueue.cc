@@ -363,7 +363,8 @@ void SharedTBFQueue::updateState(int i) // i = queue index
 simtime_t SharedTBFQueue::getThreshTime(int i) // i = queue index
 {
 	updateState(i);                                                           // data remaining / rate
-	simtime_t time2 = simTime() + 0.001 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
+//	simtime_t time2 = simTime() + 0.001 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
+	simtime_t time2 = simTime() + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
 	
 	EV << "Threshold time calculations for queue " << i << endl;
 	EV << "meanRate = " << meanRate[i] / 1e6 << " Mbps" << endl;
@@ -546,11 +547,13 @@ void SharedTBFQueue::updateAll()
 	// if the algorithm cannot apply right now, leave sharedRate to be given to sharedBucket at next updateAll()
 	//---
 	// find a legitimate time to start with
+	bool foundActive = false;
 	int startPoint = 0;
 	for (int i=0; i<numQueues; i++)
 	{
 		if (isActive[i])
 		{
+			foundActive = true;
 			threshTime[i] = getThreshTime(i);
 			earliestThreshTime = threshTime[i];
 			currentEarliestQueue = i;
@@ -559,14 +562,12 @@ void SharedTBFQueue::updateAll()
 		}
 	}
 	secondEarliestThreshTime = SimTime::getMaxTime();
-	bool foundActive = false;
 	// find new event times for all queues
 	// send one threshold msg (earliest) and all conformity msgs
 	for (int i=startPoint; i<numQueues; i++)
 	{
 		if (isActive[i])
 		{
-			foundActive = true;
 			threshTime[i] = getThreshTime(i);
 			if (threshTime[i] == earliestThreshTime)
 			{
@@ -606,13 +607,24 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 		{
 			if (threshTime[queueIndex] > secondEarliestThreshTime) // for efficiency - don't need to recalculate everything if it's still the earliest
 			{
-				earliestThreshTime = threshTime[0];
-				secondEarliestThreshTime = SimTime::getMaxTime();
+				int startPoint = 0;
 				for (int i=0; i<numQueues; i++)
 				{
 					if (isActive[i])
 					{
 						foundActive = true;
+						threshTime[i] = getThreshTime(i);
+						earliestThreshTime = threshTime[i];
+						currentEarliestQueue = i;
+						startPoint = i+1;
+						break;
+					}
+				}
+				secondEarliestThreshTime = SimTime::getMaxTime();
+				for (int i=startPoint; i<numQueues; i++)
+				{
+					if (isActive[i])
+					{
 						threshTime[i] = getThreshTime(i);
 						if (threshTime[i] == earliestThreshTime)
 						{
