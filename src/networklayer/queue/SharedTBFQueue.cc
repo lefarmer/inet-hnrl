@@ -148,6 +148,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
 			int pktLength = (check_and_cast<cPacket *>(queues[queueIndex]->front()))->getBitLength();
 			ASSERT(isConformed(queueIndex, pktLength)); 
 			conformityFlag[queueIndex] = true;
+			updateOneQueue(queueIndex);
 			
 			if (packetRequested > 0)
 			{
@@ -199,6 +200,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
                     {
                         numQueueSent[queueIndex]++;
                     }
+					updateOneQueue(queueIndex);
                     currentQueueIndex = queueIndex;
                     sendOut(msg);
                 }
@@ -207,6 +209,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
                     bool dropped = enqueue(msg);
                     if (dropped)
                     {
+						updateOneQueue(queueIndex);
                         if (warmupFinished == true)
                         {
                             numQueueDropped[queueIndex]++;
@@ -215,6 +218,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
                     else
                     {
                         conformityFlag[queueIndex] = true;
+						updateOneQueue(queueIndex);
                     }
                 }
             }
@@ -313,6 +317,7 @@ cMessage *SharedTBFQueue::dequeue()
         if (isConformed(currentQueueIndex, pktLength))
         {
             conformityFlag[currentQueueIndex] = true;
+			updateOneQueue(currentQueueIndex);
         }
         else
         {
@@ -396,7 +401,6 @@ bool SharedTBFQueue::isConformed(int queueIndex, int pktLength)
         {
             meanBucketLength[queueIndex] -= pktLength;
             peakBucketLength[queueIndex] -= pktLength;
-            updateOneQueue(queueIndex);
             return true;
         }
     }
