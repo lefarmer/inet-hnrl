@@ -365,8 +365,8 @@ void SharedTBFQueue::updateState(int i) // i = queue index
 simtime_t SharedTBFQueue::getThreshTime(int i) // i = queue index
 {
 	updateState(i);                                                           // data remaining / rate
-//	simtime_t time2 = simTime() + 0.001 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
-	simtime_t time2 = simTime() + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
+	simtime_t time2 = simTime() + 0.001 + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
+//	simtime_t time2 = simTime() + ((bucketSize[i] * threshValue) - meanBucketLength[i]) / ((isActive[i] ? meanRate[i] : 0.0) + modRate[i]);
 	
 	EV << "Threshold time calculations for queue " << i << endl;
 	EV << "meanRate = " << meanRate[i] / 1e6 << " Mbps" << endl;
@@ -433,9 +433,8 @@ void SharedTBFQueue::triggerConformityTimer(int queueIndex, int pktLength)
 	if (conformityTimer[queueIndex]->isScheduled())
 	{
 		EV << "Trying to send conformity message already scheduled" << endl;
-		cancelEvent(conformityTimer[queueIndex]);
+	//	cancelEvent(conformityTimer[queueIndex]);
 	}
-	
 	scheduleAt(simTime() + max(meanDelay, peakDelay), conformityTimer[queueIndex]);
 }
 
@@ -507,7 +506,7 @@ void SharedTBFQueue::updateAll()
 		// gather rates from donating subscribers and cancel all conformity timers
 		for (int i=0; i<numQueues; i++)
 		{
-			if (meanBucketLength[i] > bucketSize[i] * threshValue)
+			if (meanBucketLength[i] >= bucketSize[i] * threshValue)
 			{
 				isActive[i] = false;
 			}
