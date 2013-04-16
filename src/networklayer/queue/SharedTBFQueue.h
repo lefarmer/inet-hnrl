@@ -159,8 +159,6 @@ class SharedTBFQueue : public PassiveQueueBase
 	 
 	 virtual void updateOneQueue(int queueIndex); // like updateState, but is called after a packet is sent i.e. the threshold time has changed
 	 
-	 virtual void prioritySchedule(cMessage *msg, int priority);
-	 
 	 virtual simtime_t getThreshTime(int queueIndex);
 };
 

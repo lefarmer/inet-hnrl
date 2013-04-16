@@ -235,7 +235,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
                 }
                 else
                 {
-                    triggerConformityTimer(queueIndex, pktLength); // TODO: this sometimes causes a multiple message error
+                    triggerConformityTimer(queueIndex, pktLength);
                     conformityFlag[queueIndex] = false;
                 }
             }
@@ -299,8 +299,6 @@ cMessage *SharedTBFQueue::dequeue()
         return NULL;
     }
 	
-	// In the simulation "cooperative_on_50m_bl8" this error occurs around the 10.3 second mark.
-	// This run of dequeue() is called by requestPacket().
 	if (conformityTimer[currentQueueIndex]->isScheduled())
 	{
 		EV << "Error: pop while conformity timer is scheduled." << endl;
@@ -507,7 +505,7 @@ void SharedTBFQueue::updateAll()
 	}
 	
 	if (useSharing){
-		// gather rates from donating subscribers and cancel all conformity timers
+		// gather rates from donating subscribers and cancel all conformity/threshold timers
 		for (int i=0; i<numQueues; i++)
 		{
 			if (meanBucketLength[i] >= bucketSize[i] * threshValue)
@@ -527,7 +525,7 @@ void SharedTBFQueue::updateAll()
 			cancelEvent(conformityTimer[i+numQueues]);
 		}
 		
-		// then distribute rates among active subscribers and send new conformity timers
+		// then distribute rates among active subscribers and send new conformity/threshold timers
 		for (int i=0; i<numQueues; i++)
 		{
 			if (isActive[i])
@@ -548,6 +546,7 @@ void SharedTBFQueue::updateAll()
 }
 
 // called when a packet is conformed and its meanBucketLength is reduced
+// must be called AFTER that queues' conformityFlag is set (this occurs outside isConformed())
 void SharedTBFQueue::updateOneQueue(int queueIndex)
 {
 	if (meanBucketLength[queueIndex] < (bucketSize[queueIndex] * threshValue))
@@ -563,18 +562,4 @@ void SharedTBFQueue::updateOneQueue(int queueIndex)
 			scheduleAt(threshTime[queueIndex], conformityTimer[queueIndex+numQueues]);
 		}
 	}
-}
-
-
-
-// ===================
-//  S C H E D U L E R
-// ===================
-
-// TODO
-// actually this might not be necessary
-
-void SharedTBFQueue::prioritySchedule(cMessage *msg, int priority) // msg or *msg?
-{
-	//---
 }
