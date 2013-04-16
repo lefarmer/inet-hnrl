@@ -549,7 +549,7 @@ void SharedTBFQueue::updateAll()
 // must be called AFTER that queues' conformityFlag is set (this occurs outside isConformed())
 void SharedTBFQueue::updateOneQueue(int queueIndex)
 {
-	if (meanBucketLength[queueIndex] < (bucketSize[queueIndex] * threshValue))
+	if (meanBucketLength[queueIndex] < (bucketSize[queueIndex] * threshValue) && useSharing)
 	{
 		if (!isActive[queueIndex])
 		{
