@@ -77,6 +77,7 @@ void SharedTBFQueue::initialize()
 	bucketSize.assign(numQueues, 0.0);
 	contribution.assign(numQueues, 0.0);
 	threshTime.assign(numQueues, simTime());
+	lastDequeueTime.assign(numQueues, 0);
 	
     for (int i=0; i<numQueues; i++)
     {
@@ -200,6 +201,7 @@ void SharedTBFQueue::handleMessage(cMessage *msg)
                     {
                         numQueueSent[queueIndex]++;
                     }
+					lastDequeueTime[queueIndex] = simTime();
 					updateOneQueue(queueIndex);
                     currentQueueIndex = queueIndex;
                     sendOut(msg);
@@ -282,22 +284,44 @@ bool SharedTBFQueue::enqueue(cMessage *msg)
 cMessage *SharedTBFQueue::dequeue()
 {
     bool found = false;
-    int startQueueIndex = (currentQueueIndex + 1) % numQueues;  // search from the next queue for a frame to transmit
-    for (int i = 0; i < numQueues; i++)
-    {
-       if (conformityFlag[(i+startQueueIndex)%numQueues])
-       {
-           currentQueueIndex = (i+startQueueIndex)%numQueues;
-           found = true;
-           break;
-       }
-    }
+	simtime_t earliest = SimTime::getMaxTime();
+	
+	if (useSharing)
+	{ // longest wait first
+		for (int i = 0; i < numQueues; i++)
+		{
+			if (conformityFlag[i])
+			{
+				found = true;
+				if (lastDequeueTime[i] < earliest)
+				{
+					earliest = lastDequeueTime[i];
+					currentQueueIndex = i;
+				}
+			}
+		}
+	}
+	else
+	{ // round robin
+		int startQueueIndex = (currentQueueIndex + 1) % numQueues;  // search from the next queue for a frame to transmit
+		for (int i = 0; i < numQueues; i++)
+		{
+		   if (conformityFlag[(i+startQueueIndex)%numQueues])
+		   {
+			   currentQueueIndex = (i+startQueueIndex)%numQueues;
+			   found = true;
+			   break;
+		   }
+		}
+	}
 
     if (!found)
     {
         // TO DO: further processing?
         return NULL;
     }
+	
+	lastDequeueTime[currentQueueIndex] = simTime();
 	
 	if (conformityTimer[currentQueueIndex]->isScheduled())
 	{

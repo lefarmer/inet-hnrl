@@ -79,6 +79,7 @@ class SharedTBFQueue : public PassiveQueueBase
 	DoubleVector contribution;
 	LongLongVector bucketSize;    // in bit; note that the corresponding parameter in NED/INI is in byte.
 	TimeVector threshTime;
+	TimeVector lastDequeueTime;
 	
 	// controller components
 	double sharedRate;
