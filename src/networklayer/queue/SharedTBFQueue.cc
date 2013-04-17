@@ -489,6 +489,8 @@ void SharedTBFQueue::finish()
 void SharedTBFQueue::updateAll()
 {
 	double tempSharedRateUsage = 0.0;
+	float tempContrib;
+	float tempActiveContribTotal = 0;
 	
 	// update own shared bucket first
 	if (useSharedBucket)
@@ -515,6 +517,7 @@ void SharedTBFQueue::updateAll()
 			else
 			{
 				isActive[i] = true;
+				tempActiveContribTotal += contribution[i];
 			}		
 			if (!isActive[i])
 			{
@@ -529,8 +532,9 @@ void SharedTBFQueue::updateAll()
 		for (int i=0; i<numQueues; i++)
 		{
 			if (isActive[i])
-			{	
-				modRate[i] = sharedRate * contribution[i];
+			{
+				tempContrib = contribution[i] / tempActiveContribTotal;
+				modRate[i] = (tempContrib * sharedRate > meanRate[i] ? meanRate[i] : tempContrib * sharedRate);
 				tempSharedRateUsage += modRate[i];
 				threshTime[i] = getThreshTime(i);
 				scheduleAt(threshTime[i], conformityTimer[i+numQueues]);
