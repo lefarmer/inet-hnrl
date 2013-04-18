@@ -51,7 +51,7 @@ void SharedTBFQueue::initialize()
 	peakRate = par("peakRate"); // in bps
 	lengthPerBPS = par("lengthPerBPS"); // for bucket size
 	threshValue = 0.95;
-	donationValue = 0.95;
+	donationValue = 0.80;
 //	earliestThreshTime = SimTime::getMaxTime();
 //	secondEarliestThreshTime = SimTime::getMaxTime();
 
@@ -286,7 +286,7 @@ cMessage *SharedTBFQueue::dequeue()
     bool found = false;
 	simtime_t earliest = SimTime::getMaxTime();
 	
-	if (useSharing)
+/*	if (useSharing)
 	{ // longest wait first
 		for (int i = 0; i < numQueues; i++)
 		{
@@ -301,7 +301,7 @@ cMessage *SharedTBFQueue::dequeue()
 			}
 		}
 	}
-	else
+	else */
 	{ // round robin
 		int startQueueIndex = (currentQueueIndex + 1) % numQueues;  // search from the next queue for a frame to transmit
 		for (int i = 0; i < numQueues; i++)
