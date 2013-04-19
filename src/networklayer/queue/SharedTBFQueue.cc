@@ -51,7 +51,7 @@ void SharedTBFQueue::initialize()
 	peakRate = par("peakRate"); // in bps
 	lengthPerBPS = par("lengthPerBPS"); // for bucket size
 	threshValue = 0.95;
-	donationValue = 0.80;
+	donationValue = 0.90;
 //	earliestThreshTime = SimTime::getMaxTime();
 //	secondEarliestThreshTime = SimTime::getMaxTime();
 
